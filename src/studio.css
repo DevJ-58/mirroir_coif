@@ -25,7 +25,9 @@
 .tool__badge.is-on { transform: scale(1); }
 
 /* ---------- comparateur avant / après ---------- */
-.split { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
+/* le calque couvre toute la cabine : seuls la poignée et ses repères captent les clics
+   (la règle « .screen.is-on > * » le rendait sinon cliquable partout) */
+.split, .screen.is-on > .split { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
 .split__line { position: absolute; left: 0; top: 0; bottom: 0; width: 0; will-change: transform; }
 .split__line::before { content: ''; position: absolute; left: -0.5px; top: 0; bottom: 0; width: 1px; background: linear-gradient(180deg, transparent, var(--gold) 18%, var(--gold) 82%, transparent); box-shadow: 0 0 18px rgba(var(--gold-rgb), 0.6); }
 .split__handle { pointer-events: auto; position: absolute; left: -28px; top: 50%; width: 56px; height: 56px; margin-top: -28px; border-radius: 50%; display: grid; place-items: center; background: var(--gold); color: var(--ink); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45), 0 0 0 8px rgba(var(--gold-rgb), 0.15); cursor: ew-resize; touch-action: none; transition: transform 0.4s var(--ease), box-shadow 0.4s; }
@@ -135,7 +137,7 @@ a.btn { text-decoration: none; cursor: none; }
 .card.is-selected .card__no { color: var(--gold); }
 .card.is-selected::after { display: none; }
 .card.is-selected .card__no::before { content: ''; display: inline-block; width: 22px; height: 1px; margin-right: 10px; vertical-align: middle; background: var(--gold); }
-.card__fav { right: auto; left: 4px; top: 4px; }
+.card__fav { left: auto; right: calc(var(--th, 104px) - 30px); top: 2px; }
 
 /* pagination */
 .pager { display: flex; align-items: center; justify-content: flex-end; gap: 14px; padding: 12px 0 14px; }
