@@ -60,8 +60,8 @@ export const apropos = {
 const FAQ = [
   ['Pour les clients', [
     ['Est-ce que mon visage est enregistré ?', 'Non. Le scan est calculé sur l’appareil du salon et effacé à la fin de la séance. Aucune image ne part sur internet.'],
-    ['Combien de temps dure le scan ?', 'Une trentaine de secondes : vous regardez la caméra, tournez lentement la tête, baissez puis levez le menton. L’avatar apparaît juste après.'],
-    ['L’avatar me ressemble-t-il vraiment ?', 'Il reprend la forme de votre visage, de votre tête et le volume de vos cheveux. Ce n’est pas une photo : c’est une maquette fidèle, pensée pour juger une coiffure.'],
+    ['Combien de temps dure le scan ?', 'Quelques secondes : vous regardez la caméra, puis tournez un peu la tête de chaque côté. Votre visage apparaît sur le mannequin juste après.'],
+    ['Pourquoi un mannequin et pas ma tête entière ?', 'Votre visage, son relief et votre teint sont posés sur une tête unique, le mannequin GARO. Toutes les coiffures sont conçues pour lui : elles tombent juste, et vous jugez la coupe avec votre propre visage.'],
     ['Puis-je essayer sans scanner ?', 'Oui : toute la collection peut être explorée sur le mannequin, sans caméra.'],
   ]],
   ['Pour les salons', [

@@ -1,6 +1,6 @@
 // Scan guidé par webcam (MediaPipe Face Landmarker, exécuté localement).
 // Cinq prises : face, trois-quarts et profil de chaque côté.
-import { FaceLandmarker, FilesetResolver, ImageSegmenter } from '@mediapipe/tasks-vision';
+import { FaceLandmarker, FilesetResolver } from '@mediapipe/tasks-vision';
 import { FACE_TRIS, canonicalVerts } from '../three/head.js';
 import { similarity, yawOf as poseYaw, pitchOf as posePitch } from './geometry.js';
 
@@ -38,19 +38,10 @@ function poseFromLandmarks(lms, W, H) {
 }
 function yawFromLandmarks(lms, W, H) { return poseYaw(poseFromLandmarks(lms, W, H)); }
 
-// segmentation en direct (aperçu de la tête pendant le scan)
-let liveSeg = null;
-async function loadLiveSegmenter() {
-  if (liveSeg) return liveSeg;
-  const fileset = await getFileset();
-  const opts = (delegate) => ({ baseOptions: { modelAssetPath: '/models/selfie_multiclass_256x256.tflite', delegate }, runningMode: 'VIDEO', outputCategoryMask: true, outputConfidenceMasks: false });
-  try { liveSeg = await ImageSegmenter.createFromOptions(fileset, opts('GPU')); } catch { liveSeg = await ImageSegmenter.createFromOptions(fileset, opts('CPU')); }
-  return liveSeg;
-}
 
-/** Capture : copie l'image source dans un canvas (taille max 1100). */
-function grab(source, w, h) {
-  const k = Math.min(1, 1100 / Math.max(w, h));
+/** Capture : copie l'image source dans un canvas (taille max réglable). */
+function grab(source, w, h, max = 1600) {
+  const k = Math.min(1, max / Math.max(w, h));
   const c = document.createElement('canvas');
   c.width = Math.round(w * k); c.height = Math.round(h * k);
   c.getContext('2d', { willReadFrequently: true }).drawImage(source, 0, 0, c.width, c.height);
@@ -82,35 +73,30 @@ export async function scanImages(imgs) {
       const lms = res.faceLandmarks?.[0];
       if (!lms) continue;
       const w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
-      const canvas = grab(img, w, h);
+      const canvas = grab(img, w, h, 2048);
       out.push({ landmarks: lms, canvas, width: canvas.width, height: canvas.height, yaw: yawFromLandmarks(lms, canvas.width, canvas.height) });
     }
   } finally { await setMode('VIDEO'); }
   if (!out.length) throw new Error('Aucun visage détecté sur les photos.');
-  return out;
+  return out.sort((p, q) => Math.abs(p.yaw) - Math.abs(q.yaw));
 }
 
 export const STEPS = [
-  { id: 'face', title: 'Regardez droit devant', hint: 'Toute votre tête dans le cercle, cheveux compris. Ne bougez plus.' },
-  { id: 'right', title: 'Tournez lentement la tête', hint: 'D’un côté, jusqu’au profil. Le cercle se remplit à chaque angle capturé.' },
-  { id: 'left', title: 'Puis lentement de l’autre côté', hint: 'Repassez par la face et continuez jusqu’à l’autre profil.' },
-  { id: 'down', title: 'Baissez la tête', hint: 'Montrez le dessus de votre tête à la caméra.' },
-  { id: 'up', title: 'Levez le menton', hint: 'Dernier angle : le dessous du visage et le cou.' },
+  { id: 'face', title: 'Regardez droit devant', hint: 'Votre visage dans le cercle, bien éclairé. Ne bougez plus.' },
+  { id: 'side1', title: 'Tournez un peu la tête', hint: 'Un quart de tour d’un côté, doucement.' },
+  { id: 'side2', title: 'Puis de l’autre côté', hint: 'Repassez par la face et tournez un peu de l’autre côté.' },
 ];
 
-// angles conservés : une vue tous les 6° de lacet, puis dessus et dessous
-const YAW_BIN = 6, YAW_MAX = 72, MAX_SHOTS = 28;
-
 /**
- * Balayage vidéo de toute la tête (~20 vues gardées).
+ * Scan du visage : une prise de face (la photo posée sur le mannequin) et deux trois-quarts
+ * qui affinent le relief (nez, pommettes, menton).
  * ui : { video, overlay, onStep(i, step), onProgress(p), onStatus(text), onFlash(), onShot(i) }
- * Résout avec la liste des prises [{ landmarks, canvas, width, height, yaw, pitch }].
+ * Résout avec la liste des prises [{ landmarks, canvas, width, height, yaw }].
  */
 export async function runVideoScan(ui, signal) {
   await loadLandmarker();
-  const seg = await loadLiveSegmenter().catch(() => null);
   const stream = await navigator.mediaDevices.getUserMedia({
-    video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 960 } }, audio: false,
+    video: { facingMode: 'user', width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false,
   });
   const video = ui.video;
   video.srcObject = stream;
@@ -120,71 +106,54 @@ export async function runVideoScan(ui, signal) {
   signal?.addEventListener('abort', stop);
 
   const ov = ui.overlay, octx = ov.getContext('2d');
-  let step = 0, hold = 0, last = performance.now(), stepStart = performance.now(), side = 0, frame = 0;
-  const shots = [], bins = new Set();
-  let maskCanvas = null;
+  let step = 0, hold = 0, last = performance.now(), stepStart = performance.now(), side = 0;
+  const shots = [];
   ui.onStep(0, STEPS[0]);
-  const keep = (lms, yaw, pitch) => {
-    const canvas = grab(video, video.videoWidth, video.videoHeight);
-    shots.push({ landmarks: lms.map((p) => ({ ...p })), canvas, width: canvas.width, height: canvas.height, yaw, pitch });
+  const keep = (lms, yaw, max) => {
+    const canvas = grab(video, video.videoWidth, video.videoHeight, max);
+    shots.push({ landmarks: lms.map((p) => ({ ...p })), canvas, width: canvas.width, height: canvas.height, yaw });
   };
 
   return new Promise((resolve, reject) => {
     signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
     const next = () => {
       hold = 0; step++; stepStart = performance.now();
-      if (step >= STEPS.length || shots.length >= MAX_SHOTS) { ui.onProgress(1); setTimeout(() => { stop(); resolve(shots); }, 350); return true; }
+      if (step >= STEPS.length) { ui.onProgress(1); setTimeout(() => { stop(); resolve(shots); }, 350); return true; }
       ui.onStep(step, STEPS[step]);
       return false;
     };
-    const sweepProgress = (sg) => { let n = 0; for (let b = YAW_BIN; b <= YAW_MAX - 12; b += YAW_BIN) if (bins.has(sg * b)) n++; return n / Math.floor((YAW_MAX - 12) / YAW_BIN); };
     const loop = () => {
       if (signal?.aborted) return;
-      const now = performance.now(), dt = Math.min(0.1, (now - last) / 1000); last = now; frame++;
+      const now = performance.now(), dt = Math.min(0.1, (now - last) / 1000); last = now;
       let res = null;
       if (video.readyState >= 2) { try { res = landmarker.detectForVideo(video, now); } catch { res = null; } }
-      // silhouette de la tête (cheveux + peau), mise à jour une image sur trois
-      if (seg && video.readyState >= 2 && frame % 3 === 0) {
-        try {
-          const r = seg.segmentForVideo(video, now);
-          const m = r.categoryMask; maskCanvas = maskToCanvas(m, maskCanvas); m.close();
-        } catch { /* segmentation indisponible : on garde le maillage seul */ }
-      }
       const lms = res?.faceLandmarks?.[0];
-      drawOverlay(octx, ov, video, lms, now, maskCanvas);
+      drawOverlay(octx, ov, video, lms, now);
       let progress = step / STEPS.length;
       if (!lms) {
         hold = Math.max(0, hold - dt * 2);
-        ui.onStatus(step === 1 || step === 2 ? 'Visage perdu : revenez un peu vers l’écran' : 'Aucun visage détecté, approchez-vous');
+        ui.onStatus('Aucun visage détecté, approchez-vous');
       } else {
         const W = video.videoWidth, H = video.videoHeight;
         const pose = poseFromLandmarks(lms, W, H);
         const yaw = poseYaw(pose), pitch = posePitch(pose);
         const xs = lms.map((p) => p.x);
         const faceW = Math.max(...xs) - Math.min(...xs);
-        ui.onStatus(faceW < 0.11 ? 'Approchez-vous un peu' : '');
+        ui.onStatus(faceW < 0.14 ? 'Approchez-vous un peu' : Math.abs(pitch) > 14 ? 'Gardez la tête droite' : '');
         if (step === 0) {
-          if (Math.abs(yaw) < 8 && Math.abs(pitch) < 12 && faceW >= 0.11) hold += dt; else hold = Math.max(0, hold - dt * 1.5);
-          progress = Math.min(1, hold / 0.9) / STEPS.length;
-          if (hold >= 0.9) { keep(lms, yaw, pitch); bins.add(0); ui.onFlash(); ui.onShot?.(0); if (next()) return; }
-        } else if (step === 1 || step === 2) {
-          const sg = step === 1 ? 0 : -side;
-          const b = Math.round(yaw / YAW_BIN) * YAW_BIN;
-          const ok = Math.abs(pitch) < 18 && Math.abs(b) >= YAW_BIN && Math.abs(b) <= YAW_MAX && (sg === 0 || Math.sign(b) === sg);
-          if (ok && !bins.has(b) && Math.abs(yaw - b) < 2.5) {
-            if (step === 1 && !side) side = Math.sign(b);
-            if (step === 2 || Math.sign(b) === side) { bins.add(b); keep(lms, yaw, pitch); ui.onShot?.(step); }
-          }
-          const sweepSide = step === 1 ? (side || 1) : -side;
-          const p = sweepProgress(sweepSide);
-          progress = (step + p) / STEPS.length;
-          if (p >= 0.99 || (now - stepStart > 14000 && p > 0.4)) { ui.onFlash(); if (next()) return; }
+          // la photo de face doit être nette : visage droit, assez grand, immobile
+          if (Math.abs(yaw) < 7 && Math.abs(pitch) < 10 && faceW >= 0.14) hold += dt; else hold = Math.max(0, hold - dt * 1.5);
+          progress = Math.min(1, hold / 1.0) / STEPS.length;
+          if (hold >= 1.0) { keep(lms, yaw, 2048); ui.onFlash(); ui.onShot?.(0); if (next()) return; }
         } else {
-          const want = step === 3 ? pitch < -16 : pitch > 14;
-          if (want && Math.abs(yaw) < 20) hold += dt; else hold = Math.max(0, hold - dt);
-          progress = (step + Math.min(1, hold / 0.5)) / STEPS.length;
-          if (hold >= 0.5) { keep(lms, yaw, pitch); ui.onFlash(); ui.onShot?.(step); if (next()) return; }
-          if (now - stepStart > 9000) { ui.onStatus('Angle passé'); if (next()) return; }
+          const ok = Math.abs(pitch) < 16 && Math.abs(yaw) >= 18 && Math.abs(yaw) <= 40 && (step === 1 ? true : Math.sign(yaw) === -side);
+          if (ok) hold += dt; else hold = Math.max(0, hold - dt);
+          progress = (step + Math.min(1, hold / 0.35)) / STEPS.length;
+          if (hold >= 0.35) {
+            if (step === 1) side = Math.sign(yaw);
+            keep(lms, yaw, 1280); ui.onFlash(); ui.onShot?.(step);
+            if (next()) return;
+          } else if (now - stepStart > 9000) { ui.onStatus('Angle passé'); if (next()) return; }
         }
       }
       ui.onProgress(progress);
@@ -192,20 +161,6 @@ export async function runVideoScan(ui, signal) {
     };
     requestAnimationFrame(loop);
   });
-}
-
-/** Masque de segmentation → petit canvas teinté (cheveux dorés, peau légère). */
-function maskToCanvas(m, cv) {
-  const w = m.width, h = m.height, data = m.getAsUint8Array();
-  if (!cv || cv.width !== w || cv.height !== h) { cv = document.createElement('canvas'); cv.width = w; cv.height = h; }
-  const g = cv.getContext('2d'), img = g.createImageData(w, h);
-  for (let i = 0; i < data.length; i++) {
-    const c = data[i], k = i * 4;
-    if (c === 1) { img.data[k] = 233; img.data[k + 1] = 207; img.data[k + 2] = 159; img.data[k + 3] = 110; }
-    else if (c === 3 || c === 2) { img.data[k] = 244; img.data[k + 1] = 237; img.data[k + 2] = 227; img.data[k + 3] = 34; }
-  }
-  g.putImageData(img, 0, 0);
-  return cv;
 }
 
 function drawOverlay(ctx, cv, video, lms, now, mask = null) {

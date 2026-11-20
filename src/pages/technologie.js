@@ -1,16 +1,16 @@
 // Technologie : la fabrication de l'avatar racontée au défilement
-// (balayage, tour de tête, maillage filaire, pousse des cheveux, confidentialité).
+// (points du visage, trois prises, visage posé sur le mannequin, coiffures, confidentialité).
 import * as THREE from 'three';
 import gsap from 'gsap';
-import { buildHeadGeometry, canonicalVerts } from '../three/head.js';
+import { buildHeadGeometry, mannequinVerts } from '../three/head.js';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { $, $$, pad2, clamp, ease, mix, P, pageHero, pageFoot, reveals, eyebrow } from './kit.js';
 
 const STEPS = [
   { n: '468', u: 'points', t: 'Le visage, point par point', d: 'La caméra repère 468 points du visage à chaque image : contour des yeux, arête du nez, lèvres, mâchoire. Ils fixent la position exacte de la tête.' },
-  { n: '25', u: 'angles', t: 'Un tour de tête', d: 'Un lent tour de tête suffit. Une vue est gardée tous les 6°, puis le dessus et le dessous. Chaque silhouette sculpte le volume réel du crâne et des cheveux.' },
-  { n: '1', u: 'maillage', t: 'La forme se tisse', d: 'Les silhouettes se croisent : la largeur, la profondeur, le front et la nuque sont mesurés. Un maillage unique, propre à la personne, remplace le mannequin.' },
-  { n: '12', u: 'coiffures', t: 'Les cheveux poussent', d: 'Chaque coiffure est construite mèche par mèche, puis ajustée au volume mesuré : un afro suit la taille réelle des cheveux, des locks leur longueur.' },
+  { n: '3', u: 'prises', t: 'Face et trois-quarts', d: 'Une photo de face, nette et bien éclairée, puis un quart de tour de chaque côté. Les trois vues affinent le relief : nez, pommettes, menton.' },
+  { n: '1', u: 'mannequin', t: 'Le visage se pose', d: 'Le relief et la photo du visage se fondent dans la tête unique du mannequin GARO, au teint de la personne. Crâne, oreilles et cou restent ceux du mannequin.' },
+  { n: '12', u: 'coiffures', t: 'Les cheveux poussent', d: 'Chaque coiffure est construite une fois, sur ce mannequin. Elle tombe donc juste sur chaque visage, et un salon peut en ajouter de nouvelles en déposant un fichier 3D.' },
   { n: '0', u: 'image envoyée', t: 'Rien ne sort du salon', d: 'Tout le calcul se fait sur l’appareil : la tablette, la télé ou la borne. Aucune photo n’est envoyée, aucune n’est conservée après la séance.' },
 ];
 
@@ -20,7 +20,7 @@ export default {
     ${pageHero({
       kicker: 'Du nuage de points à la mèche',
       title: 'Techno|logie',
-      lede: 'Une caméra, un tour de tête, et quelques secondes de calcul. Voici comment le mannequin devient vous, sans qu’aucune image ne quitte le salon.',
+      lede: 'Une caméra, trois prises du visage, et quelques secondes de calcul. Voici comment votre visage se pose sur le mannequin, sans qu’aucune image ne quitte le salon.',
       side: 'left',
     })}
     <section class="tc" id="tcRun" style="height:${STEPS.length * 110 + 60}vh">
@@ -41,8 +41,8 @@ export default {
       ${eyebrow('En chiffres')}
       <div class="tc-specs__grid">
         <div data-reveal><b data-count="468">0</b><span>points suivis sur le visage, à chaque image</span></div>
-        <div data-reveal><b data-count="25">0</b><span>angles de vue gardés pendant le tour de tête</span></div>
-        <div data-reveal><b data-count="12">0</b><span>coiffures construites en 3D, ajustées au volume mesuré</span></div>
+        <div data-reveal><b data-count="3">0</b><span>prises du visage : face et deux trois-quarts</span></div>
+        <div data-reveal><b data-count="12">0</b><span>coiffures construites en 3D sur le mannequin GARO</span></div>
         <div data-reveal><b>0</b><span>image envoyée sur internet. Tout reste sur l’appareil</span></div>
       </div>
     </section>
@@ -74,7 +74,7 @@ export default {
     let net = null;
     const wire = (on) => {
       if (on && !net) {
-        const g = buildHeadGeometry(avatar.scan ? avatar.scan.verts : canonicalVerts(), null, { NT: 64, NY: 56 });
+        const g = buildHeadGeometry(avatar.scan ? avatar.scan.verts : mannequinVerts(), null, { NT: 64, NY: 56 });
         net = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: 0xe9cf9f, wireframe: true, transparent: true, opacity: 0, depthWrite: false }));
         net.scale.setScalar(1.006);
         avatar.group.add(net);
@@ -116,7 +116,7 @@ export default {
             scan.classList.add('is-on');
           } else { avatar.uniforms.uReveal.value = 1; scan.classList.remove('is-on'); }
           // étape 2 : un tour complet
-          inst.spin = inRun && i === 1 ? ease(local) * Math.PI * 2 : 0;
+          inst.spin = inRun && i === 1 ? Math.sin(local * Math.PI * 2) * 0.7 : 0;
         },
         onToggle: (self) => {
           inRun = self.isActive;

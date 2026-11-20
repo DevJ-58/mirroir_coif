@@ -18,10 +18,10 @@ const K = [
   [-5.0, 6.9, 4.4, -11.0],
   [-7.0, 6.0, 4.1, -10.1],
   [-9.0, 5.0, 2.6, -9.7],
-  [-10.6, 4.9, 0.6, -9.4],
-  [-13.0, 5.0, -0.3, -9.2],
-  [-17.0, 5.3, -0.2, -9.4],
-  [-24.0, 5.9, 0.2, -9.9],
+  [-10.6, 5.2, 0.6, -9.6],
+  [-13.0, 5.5, 0.2, -9.6],
+  [-17.0, 5.75, 0.3, -9.8],
+  [-24.0, 6.1, 0.5, -10.0],
 ];
 
 function cr(p0, p1, p2, p3, t) {
@@ -68,17 +68,30 @@ export function headProfile(y, out = _prof) {
 }
 /** Section du modèle générique (sans forme mesurée). */
 export function baseHeadProfile(y, out = { rx: 0, c: 0, rz: 0 }) { return baseProfile(y, out); }
+// départ du dôme : valeurs et pentes de la courbe du crâne à cette hauteur,
+// pour que le dôme prolonge la tête sans pli visible sur le front
+const DOME_Y = 7.4;
+let DOME = null;
+function domeStart() {
+  const a = splineProfile(DOME_Y, {}), b = splineProfile(DOME_Y - 0.05, {});
+  return { rx: a.rx, rz: a.rz, c: a.c, drx: (a.rx - b.rx) / 0.05, drz: (a.rz - b.rz) / 0.05 };
+}
 function baseProfile(y, out) {
-  if (y > 8.3) {
-    // dôme crânien analytique
-    const k = Math.min(1, (y - 8.3) / (HEAD_TOP - 8.3));
+  if (y > DOME_Y) {
+    // dôme crânien analytique (quart d'ellipse), raccordé en pente à la courbe du dessous
+    DOME = DOME || domeStart();
+    const H = HEAD_TOP - DOME_Y;
+    const k = Math.min(1, (y - DOME_Y) / H);
     const s = Math.sqrt(Math.max(0, 1 - k * k));
-    const c0 = (4.5 - 14.4) / 2, r0 = (4.5 + 14.4) / 2;
-    out.rx = Math.max(0.001, 7.6 * s);
-    out.rz = Math.max(0.001, r0 * s);
-    out.c = c0 + (-4.6 - c0) * k;
+    const bend = k * (1 - k) * (1 - k);
+    out.rx = Math.max(0.001, DOME.rx * s + DOME.drx * H * bend);
+    out.rz = Math.max(0.001, DOME.rz * s + DOME.drz * H * bend);
+    out.c = DOME.c + (-4.6 - DOME.c) * k * k;
     return out;
   }
+  return splineProfile(y, out);
+}
+function splineProfile(y, out) {
   if (y <= K[K.length - 1][0]) {
     const k = K[K.length - 1];
     out.rx = k[1]; out.c = (k[2] + k[3]) / 2; out.rz = (k[2] - k[3]) / 2;
@@ -113,15 +126,19 @@ export function surfaceNormal(theta, y, out = new THREE.Vector3()) {
   return out;
 }
 
-// --- Cape de coiffeur (collisions + maillage) ---
+// --- Buste du mannequin : cou, épaules, haut du torse (collisions + maillage) ---
+// Le haut du buste démarre juste à l'intérieur du cou : la jonction ne se voit pas.
 const CAPE = [
-  [-13.2, 6.0, 5.3],
-  [-16.0, 6.7, 5.9],
-  [-19.0, 10.8, 7.6],
-  [-22.0, 17.0, 9.6],
-  [-26.0, 21.6, 11.0],
-  [-32.0, 23.6, 12.0],
-  [-60.0, 24.6, 12.6],
+  [-15.2, 5.55, 4.75],
+  [-16.8, 5.95, 5.0],
+  [-18.6, 7.7, 5.6],
+  [-21.0, 11.2, 6.6],
+  [-23.0, 15.2, 7.6],
+  [-25.4, 18.6, 8.5],
+  [-28.6, 20.6, 9.3],
+  [-33.0, 21.0, 9.8],
+  [-40.0, 20.2, 10.0],
+  [-60.0, 19.6, 10.0],
 ];
 export const CAPE_C = -4.7;
 export function capeProfile(y) {
@@ -331,6 +348,36 @@ export function buildHeadGeometry(verts, uvs, { NT = 240, NY = 260 } = {}) {
 }
 
 export function canonicalVerts() { return Float32Array.from(canon.v); }
+
+/**
+ * Visage du mannequin de vitrine : la surface lisse du crâne, sculptée de quelques
+ * reliefs très doux (arête du nez, arcades, pommettes, menton). Ni yeux ni bouche.
+ */
+let _blank = null;
+export function mannequinVerts() {
+  if (_blank) return Float32Array.from(_blank);
+  const c = canon.v, n = c.length / 3;
+  const pr = { rx: 0, c: 0, rz: 0 };
+  const g = (x, y, cx, cy, sx, sy) => Math.exp(-(((x - cx) / sx) ** 2 + ((y - cy) / sy) ** 2));
+  const v = Float32Array.from(c);
+  for (let i = 0; i < n; i++) {
+    const x = c[i * 3], y = c[i * 3 + 1];
+    baseProfile(y, pr);
+    const u = Math.min(0.98, Math.abs(x) / pr.rx);
+    let z = pr.c + pr.rz * Math.sqrt(1 - u * u);
+    z += 1.1 * g(x, y, 0, -0.6, 0.9, 2.6) * (y < 2.6 ? 1 : 0.55);    // nez
+    z += 0.7 * g(x, y, 0, -2.6, 1.2, 0.9);                              // bout du nez
+    z += 0.35 * (g(x, y, -3.1, 4.2, 2.2, 0.8) + g(x, y, 3.1, 4.2, 2.2, 0.8)); // arcades
+    z -= 0.28 * (g(x, y, -3.1, 2.7, 1.6, 1.0) + g(x, y, 3.1, 2.7, 1.6, 1.0)); // orbites
+    z += 0.25 * (g(x, y, -3.9, -0.6, 1.8, 1.6) + g(x, y, 3.9, -0.6, 1.8, 1.6)); // pommettes
+    z += 0.3 * g(x, y, 0, -5.0, 1.6, 0.7);                              // lèvres, à peine
+    z += 0.5 * g(x, y, 0, -7.6, 2.2, 1.2);                              // menton
+    v[i * 3 + 2] = z;
+  }
+  _blank = v;
+  return Float32Array.from(v);
+}
+
 export function canonicalUVs() { return Float32Array.from(canon.uv); }
 export const FACE_TRIS = canon.f;
 

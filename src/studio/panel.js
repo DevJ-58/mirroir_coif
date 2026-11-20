@@ -8,7 +8,7 @@ const pad2 = (n) => String(n).padStart(2, '0');
 
 export function initPanel({ STYLES }) {
   const panel = $('#panel'), wrap = $('#cards');
-  const cards = $$('.card', wrap);
+  let cards = $$('.card', wrap);
   const catOf = (c) => STYLES.find((s) => s.id === c.dataset.id).cat;
   let filter = 'all', page = 0, size = 4, busy = false, queued = null;
 
@@ -91,6 +91,8 @@ export function initPanel({ STYLES }) {
   window.addEventListener('resize', () => { clearTimeout(rT); rT = setTimeout(() => { if (pageSize() !== size) render(1, false); }, 200); });
 
   return {
+    /** La collection a changé (coiffure déposée ou retirée). */
+    refresh() { cards = $$('.card', wrap); filter = 'all'; page = 0; busy = false; render(1, false); },
     /** Première présentation (entrée du studio). */
     intro() { cards.forEach((c) => c.classList.remove('is-shown')); busy = false; render(1); },
     /** Amène la carte d'un style à l'écran si elle est sur une autre page. */

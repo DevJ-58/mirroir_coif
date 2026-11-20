@@ -1,7 +1,8 @@
 import * as THREE from 'three';
-import { buildHeadGeometry, canonicalVerts, capeProfile, CAPE_C, setSkullScale, setHeadShape, headProfile } from './head.js';
+import { buildHeadGeometry, mannequinVerts, capeProfile, CAPE_C, setSkullScale, setHeadShape, headProfile } from './head.js';
 
-const MANNEQUIN = new THREE.Color('#cdbfb0');
+// blanc mat du mannequin de vitrine
+const MANNEQUIN = new THREE.Color('#e4dfd8');
 
 export class Avatar {
   constructor() {
@@ -38,7 +39,8 @@ export class Avatar {
     this.currentHair = null; // cheveux réels de la personne scannée
     this.hairShown = true;
 
-    this.cape = new THREE.Mesh(buildCapeGeometry(), this._makeCapeMaterial());
+    // buste : même matière que la tête (peau scannée ou blanc du mannequin)
+    this.cape = new THREE.Mesh(buildCapeGeometry(), this.skinMat);
     this.group.add(this.cape);
 
     this.setMannequin();
@@ -108,26 +110,30 @@ export class Avatar {
     this._setCurrentHair(null);
     this.scan = null;
     this.uniforms.uHasCol.value = 0;
-    this._setGeometry(canonicalVerts(), null);
+    this._setGeometry(mannequinVerts(), null);
     this.uniforms.uSkin.value.copy(MANNEQUIN);
     this.uniforms.uHasMap.value = 0;
-    this.skinMat.roughness = 0.42;
-    this.skinMat.clearcoat = 0.35;
+    this.skinMat.roughness = 0.62;
+    this.skinMat.clearcoat = 0.08;
+    this.skinMat.sheen = 0.15;
     this.realistic = false;
   }
 
-  /** scan : résultat de reconstruct() (forme, couleurs projetées, cheveux actuels) */
+  /**
+   * Visage scanné posé sur la tête standard du mannequin.
+   * scan : { verts (468 points, relief), uvs (coordonnées dans la photo), texture, skin }
+   */
   setScan(scan) {
     this.scan = scan;
-    setSkullScale(scan.skullScale);
-    setHeadShape(scan.shape);
+    setSkullScale(1);
+    setHeadShape(null);
     this._placeEars();
-    // maillage plus fin : les couleurs sont portées par les sommets
-    const g = buildHeadGeometry(scan.verts, null, { NT: 380, NY: 420 });
-    scan.colorizeHead(g);
+    this._setCurrentHair(null);
+    const g = buildHeadGeometry(scan.verts, scan.uvs, { NT: 300, NY: 340 });
     this.head.geometry.dispose();
     this.head.geometry = g;
-    this._setCurrentHair(scan.buildHairShell());
+    if (this.uniforms.uFaceMap.value && this.uniforms.uFaceMap.value !== scan.texture) this.uniforms.uFaceMap.value.dispose();
+    this.uniforms.uFaceMap.value = scan.texture;
     this.showRealistic(true);
   }
 
@@ -149,17 +155,20 @@ export class Avatar {
     if (!this.scan) return;
     this.realistic = on;
     if (on) {
-      this.uniforms.uHasCol.value = 1;
-      this.uniforms.uHasMap.value = 0;
+      // la photo du visage, fondue dans le teint mesuré qui habille tout le mannequin
+      this.uniforms.uHasCol.value = 0;
+      this.uniforms.uHasMap.value = 1;
       this.uniforms.uSkin.value.copy(this.scan.skin);
-      this.skinMat.roughness = 0.58;
-      this.skinMat.clearcoat = 0.12;
+      this.skinMat.roughness = 0.6;
+      this.skinMat.clearcoat = 0.06;
+      this.skinMat.sheen = 0.3;
     } else {
       this.uniforms.uHasMap.value = 0;
       this.uniforms.uHasCol.value = 0;
       this.uniforms.uSkin.value.copy(MANNEQUIN);
-      this.skinMat.roughness = 0.42;
-      this.skinMat.clearcoat = 0.35;
+      this.skinMat.roughness = 0.62;
+      this.skinMat.clearcoat = 0.08;
+      this.skinMat.sheen = 0.15;
     }
     this._syncHair();
   }
@@ -172,16 +181,17 @@ export class Avatar {
 }
 
 function buildCapeGeometry() {
-  const NT = 160, NY = 90, y0 = -13.2, y1 = -58;
+  const NT = 200, NY = 110, y0 = -15.2, y1 = -58;
   const pos = [], idx = [];
   for (let j = 0; j <= NY; j++) {
     const y = y0 + (y1 - y0) * (j / NY);
     const p = capeProfile(y - 0.0001) || { rx: 6, rz: 5.3 };
     for (let i = 0; i <= NT; i++) {
       const th = -Math.PI + (i / NT) * Math.PI * 2;
-      // légers plis du tissu
-      const fold = 1 + 0.018 * Math.sin(th * 9 + y * 0.15) * Math.min(1, (y0 - y) / 12);
-      pos.push(p.rx * fold * Math.sin(th), y, CAPE_C + p.rz * fold * Math.cos(th));
+      // le torse s'aplatit devant et derrière, les épaules s'arrondissent
+      const s = Math.sin(th), c = Math.cos(th);
+      const flat = 1 - 0.06 * Math.pow(Math.abs(c), 6) * Math.min(1, (y0 - y) / 8);
+      pos.push(p.rx * s, y, CAPE_C + p.rz * c * flat);
     }
   }
   for (let j = 0; j < NY; j++) for (let i = 0; i < NT; i++) {
@@ -192,13 +202,11 @@ function buildCapeGeometry() {
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   g.setIndex(idx);
   g.computeVertexNormals();
-  // col roulé
-  const collar = new THREE.TorusGeometry(1, 0.075, 16, 96);
-  collar.rotateX(Math.PI / 2);
-  collar.scale(6.1, 6.5, 5.4);
-  collar.translate(0, -13.3, CAPE_C);
-  const merged = mergeSimple([g, collar]);
-  return merged;
+  const n = g.attributes.position.count;
+  g.setAttribute('aFace', new THREE.BufferAttribute(new Float32Array(n), 1));
+  g.setAttribute('aUv', new THREE.BufferAttribute(new Float32Array(n * 2), 2));
+  g.setAttribute('aCol', new THREE.BufferAttribute(new Float32Array(n * 3), 3));
+  return g;
 }
 
 function mergeSimple(geos) {

@@ -1,6 +1,9 @@
 import * as THREE from 'three';
 import gsap from 'gsap';
 import { buildHairstyle } from './hairStyles.js';
+import { buildGlbHair } from './glbHair.js';
+
+const DEFAULT_HEX = '#15100d';
 
 /** Gère les coiffures posées sur l'avatar : cache, transitions, couleur. */
 export class HairManager {
@@ -11,6 +14,7 @@ export class HairManager {
     this.color = new THREE.Color('#15100d');
     this.tip = new THREE.Color('#15100d');
     this.ctx = null;       // volume réel des cheveux (scan) : adapte certains styles
+    this.tint = 0;         // coiffures .glb : 0 = couleurs d'origine du fichier
     this.onChange = null;  // appelé quand la coiffure affichée change (id ou null)
   }
 
@@ -28,7 +32,7 @@ export class HairManager {
 
   get(style) {
     if (!this.cache.has(style.id)) {
-      const h = buildHairstyle(style.kind, '#15100d', this.ctx);
+      const h = style.kind === 'glb' ? this._glb(style) : buildHairstyle(style.kind, DEFAULT_HEX, this.ctx);
       h.group.visible = false;
       h.common.uGrow.value = 0;
       this.parent.add(h.group);
@@ -38,6 +42,22 @@ export class HairManager {
     h.common.uColor.value.copy(this.color);
     h.common.uTip.value.copy(this.tip);
     return h;
+  }
+
+  _glb(style) {
+    const common = { uColor: { value: this.color.clone() }, uTip: { value: this.tip.clone() }, uGrow: { value: 1 }, uTint: { value: this.tint } };
+    const group = buildGlbHair(style.id, common);
+    group.traverse((o) => { if (o.isMesh) o.renderOrder = 2; });
+    return { group, common, glb: true };
+  }
+
+  /** Retire une coiffure du cache (coiffure déposée supprimée ou remplacée). */
+  drop(id) {
+    const h = this.cache.get(id); if (!h) return;
+    if (this.current === id) { this.current = null; this.onChange?.(null); }
+    this.parent.remove(h.group);
+    h.group.traverse((o) => { if (o.isMesh) { if (!h.glb) o.geometry.dispose(); (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => m.dispose()); } });
+    this.cache.delete(id);
   }
 
   /** Affiche une coiffure. mode : 'drop' (glisse depuis le haut) | 'grow' | 'instant' */
@@ -89,13 +109,15 @@ export class HairManager {
   setColor(hex, tipHex) {
     const target = new THREE.Color(hex), tip = new THREE.Color(tipHex || hex);
     const from = this.color.clone(), fromTip = this.tip.clone();
+    const fromTint = this.tint, toTint = hex.toLowerCase() === DEFAULT_HEX ? 0 : 1;
     const o = { t: 0 };
     gsap.to(o, {
       t: 1, duration: 0.8, ease: 'power2.out',
       onUpdate: () => {
         this.color.copy(from).lerp(target, o.t);
         this.tip.copy(fromTip).lerp(tip, o.t);
-        for (const h of this.cache.values()) { h.common.uColor.value.copy(this.color); h.common.uTip.value.copy(this.tip); }
+        this.tint = fromTint + (toTint - fromTint) * o.t;
+        for (const h of this.cache.values()) { h.common.uColor.value.copy(this.color); h.common.uTip.value.copy(this.tip); if (h.common.uTint) h.common.uTint.value = this.tint; }
       },
     });
   }
