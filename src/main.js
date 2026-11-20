@@ -11,6 +11,8 @@ import { initCursor, initMagnetic, setCursor } from './ui/cursor.js';
 import { createSite, curtain, prepDraw } from './site/site.js';
 import { initExtras } from './studio/extras.js';
 import { initPanel } from './studio/panel.js';
+import { createRouter } from './site/router.js';
+import { PAGES } from './pages/index.js';
 
 if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
 window.scrollTo(0, 0);
@@ -42,6 +44,8 @@ const state = {
 const mouse = { x: 0, y: 0, sx: 0, sy: 0 };
 window.addEventListener('pointermove', (e) => { mouse.x = e.clientX / window.innerWidth - 0.5; mouse.y = e.clientY / window.innerHeight - 0.5; });
 const site = createSite({ stage, avatar, hair, STYLES, COLORS, mouse, onTry: (id) => tryStyle(id) });
+window.__garoLenis = site.lenis;
+const router = createRouter({ site, pages: PAGES, ctx: { hair, STYLES, CATEGORIES, COLORS, stage, avatar, onTry: (id) => tryStyle(id), beforeRoute: () => site.closeMenu(), thumbs: null } });
 stage.onTick((dt, t) => {
   mouse.sx += (mouse.x - mouse.sx) * 0.05; mouse.sy += (mouse.y - mouse.sy) * 0.05;
   if (state.idle) {
@@ -170,7 +174,7 @@ function idle() {
 function enterSite(first = false) {
   show('site');
   state.idle = false;
-  if (first) site.intro(); else site.enter();
+  if (first) { router.start(); site.intro(); } else site.enter();
 }
 function leaveSite() { site.leave(); }
 
@@ -413,6 +417,7 @@ async function renderThumbs() {
     if (img) { img.src = thumbs[s.id]; img.classList.add('ready'); img.previousElementSibling?.remove(); }
   }
   site.setThumbs(thumbs);
+  router.setThumbs(thumbs);
 }
 
 function enterStudio() {
@@ -696,7 +701,7 @@ boot();
 
 // accès debug
 window.__miroir = {
-  stage, avatar, hair, state, STYLES, select, processCapture, site, reconstruct,
+  stage, avatar, hair, state, STYLES, select, processCapture, site, reconstruct, router,
   view(id, theta = 0.5, phi = 1.4, radius = 95) {
     stage.controls.enabled = false; stage.shift(0, 0, 0.01);
     $$('.screen').forEach((s) => (s.style.opacity = 0));

@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import Lenis from 'lenis';
+import { MENU } from '../pages/menu.js';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -63,6 +64,8 @@ export function createSite({ stage, avatar, hair, STYLES, COLORS, mouse, onTry }
   const pose = { ...poses().hero, spin: 0, rotY: 0 };
   let active = false;
   let current = 'hero';
+  // page secondaire affichée (routeur) : elle fournit la pose du mannequin et son opacité
+  let page = null;
 
   // position écran de la tête (pour le cadre de scan et le cadran 360°)
   const HEAD = new THREE.Vector3(0, 2.6, -4.9), _w = new THREE.Vector3(), _e = new THREE.Vector3();
@@ -79,10 +82,11 @@ export function createSite({ stage, avatar, hair, STYLES, COLORS, mouse, onTry }
   stage.onTick((dt, t) => {
     if (!active) return;
     stage.controls.enabled = false; stage.controls.autoRotate = false;
-    const T = targetPose(), f = 1 - Math.pow(0.012, dt);   // lissage indépendant de la cadence
+    const T = page ? page.pose(poses(), stacked()) : targetPose(), f = 1 - Math.pow(page?.smooth ?? 0.012, dt);   // lissage indépendant de la cadence
     for (const key of KEYS) pose[key] += (T[key] - pose[key]) * f;
     stage.view.shiftX = pose.x; stage.view.shiftY = pose.y; stage._applyView();
     stage._setSpherical({ theta: pose.theta + pose.spin, phi: pose.phi, radius: fitR(pose.r), ty: pose.ty });
+    if (page) { pose.spin += ((page.spin || 0) - pose.spin) * f; }
     stage.root.rotation.y = pose.rotY + pose.sway * (Math.sin(t * 0.35) * 0.42 + mouse.sx * 0.55);
     stage.root.rotation.x = pose.sway * mouse.sy * 0.1;
     if (current === 'proc') {
@@ -136,6 +140,7 @@ export function createSite({ stage, avatar, hair, STYLES, COLORS, mouse, onTry }
     final: () => hair.show(byId('afro'), 'drop'),
   };
   function setCurrent(key) {
+    if (page) return;
     if (current === key) return;
     if (current === 'hero') stopCycle();
     if (current === 'colors' && key !== 'colors') { hair.setColor(COLORS[0].hex, COLORS[0].tip); gsap.to('#bgTint', { opacity: 0, duration: 1 }); }
@@ -410,6 +415,7 @@ export function createSite({ stage, avatar, hair, STYLES, COLORS, mouse, onTry }
   const gl = $('#gl');
   stage.onTick(() => {
     if (!active) return;
+    if (page) { gl.style.opacity = (page.opacity ? page.opacity() : 1).toFixed(3); return; }
     let o = 1 - glFade.salIn.progress + glFade.salOut.progress;
     o = Math.min(1, Math.max(0, o)) * (1 - 0.82 * glFade.foot.progress);
     if (stacked()) o *= 1 - 0.8 * (glFade.maniIn.progress - glFade.maniOut.progress);
@@ -471,8 +477,28 @@ export function createSite({ stage, avatar, hair, STYLES, COLORS, mouse, onTry }
     if (document.body.classList.contains('menu-open')) { toggleMenu(false); setTimeout(go, 450); } else go();
   });
 
-  // ---------- menu mobile ----------
+  // ---------- menu plein écran ----------
   const menu = $('#menu');
+  $('#menuLinks').innerHTML = MENU.map((m, i) => `<a href="${m.path}" data-link data-i="${i}"><i>${pad2(i + 1)}</i><span>${m.label}</span></a>`).join('');
+  let thumbMap = {};
+  const menuImg = $('#menuImg'), menuDesc = $('#menuDesc'), menuNum = $('#menuNum');
+  let menuI = -1;
+  function menuPreview(i) {
+    if (menuI === i) return;
+    menuI = i;
+    const m = MENU[i];
+    $$('#menuLinks a').forEach((a, k) => a.classList.toggle('is-hover', k === i));
+    menuNum.textContent = pad2(i + 1);
+    menuDesc.textContent = m.desc;
+    const src = thumbMap[m.preview];
+    gsap.killTweensOf(menuImg);
+    gsap.timeline()
+      .to(menuImg, { clipPath: 'inset(0 0 100% 0)', duration: 0.3, ease: 'power3.in' })
+      .call(() => { if (src) menuImg.src = src; })
+      .fromTo(menuImg, { clipPath: 'inset(100% 0 0 0)', scale: 1.15 }, { clipPath: 'inset(0% 0 0 0)', scale: 1, duration: 0.8, ease: 'expo.out' });
+    gsap.fromTo([menuDesc, menuNum], { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.6, ease: 'expo.out', stagger: 0.05 });
+  }
+  $('#menuLinks').addEventListener('pointerover', (e) => { const a = e.target.closest('a'); if (a) menuPreview(+a.dataset.i); });
   function toggleMenu(open) {
     document.body.classList.toggle('menu-open', open);
     $('#burger').setAttribute('aria-expanded', String(open));
@@ -481,7 +507,12 @@ export function createSite({ stage, avatar, hair, STYLES, COLORS, mouse, onTry }
       gsap.fromTo('.menu__bg', { clipPath: 'circle(0% at calc(100% - 44px) 44px)' }, { clipPath: 'circle(150% at calc(100% - 44px) 44px)', duration: 1, ease: 'expo.inOut' });
       gsap.fromTo('.menu__links a span, .menu__links a i', { yPercent: 110 }, { yPercent: 0, duration: 1, ease: 'expo.out', stagger: 0.04, delay: 0.35 });
       gsap.fromTo('.menu__foot', { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.8, delay: 0.6 });
+      gsap.fromTo('.menu__preview', { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 1, ease: 'expo.out', delay: 0.45 });
+      const path = location.pathname.length > 1 ? location.pathname.replace(/[/]+$/, '') : '/';
+      const here = MENU.findIndex((m) => m.path === path || (m.path !== '/' && path.startsWith(m.path + '/')));
+      menuI = -1; menuPreview(Math.max(0, here));
     } else {
+      gsap.to('.menu__preview', { opacity: 0, duration: 0.3 });
       gsap.to('.menu__links a span, .menu__links a i, .menu__foot', { yPercent: -110, opacity: 0, duration: 0.4, ease: 'power3.in', stagger: 0.015, onComplete: () => gsap.set('.menu__links a span, .menu__links a i, .menu__foot', { clearProps: 'opacity' }) });
       gsap.to('.menu__bg', { clipPath: 'circle(0% at calc(100% - 44px) 44px)', duration: 0.8, ease: 'expo.inOut', delay: 0.2, onComplete: () => menu.classList.remove('is-on') });
       if (active) lenis.start();
@@ -489,6 +520,7 @@ export function createSite({ stage, avatar, hair, STYLES, COLORS, mouse, onTry }
   }
   $('#burger').addEventListener('click', () => toggleMenu(!document.body.classList.contains('menu-open')));
   menu.addEventListener('click', (e) => { if (e.target.closest('[data-action]')) toggleMenu(false); });
+  window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && document.body.classList.contains('menu-open')) toggleMenu(false); });
 
   // les déclencheurs se recalculent quand la mise en page change (rotation de tablette…)
   let rT;
@@ -527,6 +559,7 @@ export function createSite({ stage, avatar, hair, STYLES, COLORS, mouse, onTry }
       lenis.start();
       ScrollTrigger.refresh();
       ScrollTrigger.update();
+      if (page) { page.resume?.(); return; }
       current = '__';
       const order = [['final', '#essayer'], ['colors', '#teintes'], ['r360', '#rotation'], ['coll', '#collection'], ['proc', '#processus'], ['mani', '#manifeste'], ['hero', '#top']];
       const key = (order.find(([, sel]) => $(sel).getBoundingClientRect().top < window.innerHeight * 0.55) || ['hero'])[0];
@@ -546,7 +579,35 @@ export function createSite({ stage, avatar, hair, STYLES, COLORS, mouse, onTry }
       document.body.classList.remove('on-light');
       $('.topbar').classList.remove('is-hidden', 'is-solid');
     },
+    /** Ouvre une page secondaire : l'accueil se met en veille, le mannequin suit la page. */
+    openPage(p) {
+      stopCycle();
+      clearInterval(screenTimer);
+      avatar.uniforms.uReveal.value = 1;
+      hair.setColor(COLORS[0].hex, COLORS[0].tip);
+      gsap.set([scanframe, dial, '#bgTint'], { opacity: 0 });
+      document.body.classList.remove('on-light');
+      page = p;
+      current = '__';
+    },
+    /** Retour à l'accueil (après que la page a été retirée). */
+    closePage() {
+      page = null;
+      pose.spin = 0;
+      if (!active) return;
+      ScrollTrigger.refresh();
+      ScrollTrigger.update();
+      current = '__';
+      const order = [['final', '#essayer'], ['colors', '#teintes'], ['r360', '#rotation'], ['coll', '#collection'], ['proc', '#processus'], ['mani', '#manifeste'], ['hero', '#top']];
+      const key = (order.find(([, sel]) => $(sel).getBoundingClientRect().top < window.innerHeight * 0.55) || ['hero'])[0];
+      setCurrent(key);
+    },
+    get page() { return page; },
+    poses, stacked, fitR,
+    closeMenu() { if (document.body.classList.contains('menu-open')) toggleMenu(false); },
     setThumbs(map) {
+      thumbMap = map;
+      if (document.body.classList.contains('menu-open') && menuI >= 0) { const m = MENU[menuI]; if (map[m.preview]) menuImg.src = map[m.preview]; }
       thumbList = STYLES.map((s) => map[s.id]).filter(Boolean);
       cards.forEach((c) => { const img = $('img', c); if (map[c.dataset.id]) { img.src = map[c.dataset.id]; img.classList.add('ready'); } });
     },

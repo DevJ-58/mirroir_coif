@@ -25,6 +25,7 @@
   <link rel="stylesheet" href="/src/style.css" />
   <link rel="stylesheet" href="/src/site.css" />
   <link rel="stylesheet" href="/src/studio.css" />
+  <link rel="stylesheet" href="/src/pages.css" />
 </head>
 <body data-screen="loader" class="is-loading">
   <!-- arrière-plan -->
@@ -46,14 +47,14 @@
 
   <!-- en-tête -->
   <header class="topbar">
-    <a class="brand" href="#" data-action="home" aria-label="GARO — accueil">
+    <a class="brand" href="/" data-link data-action="home" aria-label="GARO — accueil">
       <svg class="brand__logo" viewBox="-4 -4 494 108" role="img" aria-label="GARO"><g fill="none" stroke-linecap="butt" stroke-miterlimit="10"><g stroke="var(--gold)" stroke-width="6"><path class="lg-s" d="M86 19.79 A47 47 0 1 0 97 50 H52"/></g><g stroke="var(--gold)" stroke-width="3"><path class="lg-s lg-t" d="M57 52.5 V68"/><path class="lg-s lg-t" d="M66.33 52.5 V68"/><path class="lg-s lg-t" d="M75.67 52.5 V68"/><path class="lg-s lg-t" d="M85 52.5 V68"/></g><g stroke="currentColor" stroke-width="6"><path class="lg-s" d="M140 100 L185 0 L230 100"/><path class="lg-s" d="M158 62 H212"/><path class="lg-s" d="M270 100 V0 H306 A27 27 0 0 1 306 54 H270"/><path class="lg-s" d="M300 54 L344 100"/><path class="lg-s" d="M483 50 A47 47 0 1 0 389 50 A47 47 0 1 0 483 50"/></g></g></svg>
     </a>
     <nav class="topnav">
-      <a href="#processus" data-scroll>Processus</a>
-      <a href="#collection" data-scroll>Collection</a>
-      <a href="#rotation" data-scroll>360°</a>
-      <a href="#salons" data-scroll>Salons</a>
+      <a href="/collection" data-link>Lookbook</a>
+      <a href="/heritage" data-link>Héritage</a>
+      <a href="/technologie" data-link>Technologie</a>
+      <a href="/salons" data-link>Salons</a>
     </nav>
     <div class="topbar__right">
       <span class="topbar__step" id="stepLabel">Accueil</span>
@@ -62,7 +63,7 @@
         <svg class="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
       </button>
       <button class="topbar__cta" data-action="scan"><span>Essayer</span></button>
-      <button class="burger" id="burger" aria-label="Menu" aria-expanded="false"><i></i><i></i></button>
+      <button class="burger" id="burger" aria-label="Menu" aria-expanded="false"><span class="burger__label">Menu</span><span class="burger__ico"><i></i><i></i></span></button>
       <button class="topbar__close" data-action="home"><span>Retour au site</span><i>✕</i></button>
     </div>
   </header>
@@ -257,13 +258,16 @@
       <footer class="footer">
         <div class="footer__brand"><svg class="footer__logo" viewBox="-4 -4 494 108" role="img" aria-label="GARO"><g fill="none" stroke-linecap="butt" stroke-miterlimit="10"><g stroke="var(--gold)" stroke-width="6"><path class="lg-s" d="M86 19.79 A47 47 0 1 0 97 50 H52"/></g><g stroke="var(--gold)" stroke-width="3"><path class="lg-s lg-t" d="M57 52.5 V68"/><path class="lg-s lg-t" d="M66.33 52.5 V68"/><path class="lg-s lg-t" d="M75.67 52.5 V68"/><path class="lg-s lg-t" d="M85 52.5 V68"/></g><g stroke="currentColor" stroke-width="6"><path class="lg-s" d="M140 100 L185 0 L230 100"/><path class="lg-s" d="M158 62 H212"/><path class="lg-s" d="M270 100 V0 H306 A27 27 0 0 1 306 54 H270"/><path class="lg-s" d="M300 54 L344 100"/><path class="lg-s" d="M483 50 A47 47 0 1 0 389 50 A47 47 0 1 0 483 50"/></g></g></svg></div>
         <div class="footer__cols">
-          <div><span class="k">Produit</span><a href="#processus" data-scroll>Processus</a><a href="#collection" data-scroll>Collection</a><a href="#salons" data-scroll>Salons</a></div>
-          <div><span class="k">Studio</span><span>Maison Akwaba</span><span>Démonstration</span></div>
+          <div><span class="k">Découvrir</span><a href="/collection" data-link>Lookbook</a><a href="/heritage" data-link>Héritage</a><a href="/technologie" data-link>Technologie</a><a href="/journal" data-link>Journal</a></div>
+          <div><span class="k">Salons</span><a href="/salons" data-link>Offre salons</a><a href="/partenaires" data-link>Salons partenaires</a><a href="/faq" data-link>Questions fréquentes</a><a href="/contact" data-link>Contact</a></div>
           <div><span class="k">©</span><span>2026 GARO</span><a href="#top" data-scroll>Haut de page ↑</a></div>
         </div>
       </footer>
     </section>
   </main>
+
+  <!-- pages secondaires (routeur) -->
+  <main class="page" id="page"></main>
 
   <!-- indicateur de progression -->
   <nav class="rail" id="rail" aria-label="Sections"></nav>
@@ -271,16 +275,14 @@
   <!-- menu mobile -->
   <div class="menu" id="menu" aria-hidden="true">
     <div class="menu__bg"></div>
-    <nav class="menu__links">
-      <a href="#top" data-scroll><i>01</i><span>Accueil</span></a>
-      <a href="#processus" data-scroll><i>02</i><span>Processus</span></a>
-      <a href="#collection" data-scroll><i>03</i><span>Collection</span></a>
-      <a href="#rotation" data-scroll><i>04</i><span>360°</span></a>
-      <a href="#teintes" data-scroll><i>05</i><span>Teintes</span></a>
-      <a href="#salons" data-scroll><i>06</i><span>Salons</span></a>
-    </nav>
+    <nav class="menu__links" id="menuLinks"></nav>
+    <aside class="menu__preview" aria-hidden="true">
+      <div class="menu__frame"><img id="menuImg" alt="" /><span class="menu__num" id="menuNum">01</span></div>
+      <p class="menu__desc" id="menuDesc"></p>
+    </aside>
     <div class="menu__foot">
       <button class="btn btn--primary" data-action="scan"><span class="btn__bg"></span><span class="btn__label">Lancer l’expérience</span><span class="btn__dot"></span></button>
+      <div class="menu__meta"><a href="/faq" data-link>FAQ</a><a href="/contact" data-link>Contact</a><span>Abidjan · 2026</span></div>
     </div>
   </div>
 
