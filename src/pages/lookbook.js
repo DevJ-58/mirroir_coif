@@ -162,7 +162,7 @@ export default {
     });
 
     const PH = (stacked) => P({ x: stacked ? 0 : 0.24, y: stacked ? 0.12 : 0.03, theta: -0.3, r: stacked ? 128 : 100, sway: 1 });
-    const PS = (stacked) => P({ x: stacked ? 0 : 0.2, y: stacked ? 0.1 : -0.02, theta: 0, phi: 1.46, r: stacked ? 128 : 98, sway: 0.08 });
+    const PS = (stacked) => P({ x: stacked ? 0 : 0.2, y: stacked ? -0.22 : -0.02, theta: 0, phi: 1.46, r: stacked ? 150 : 98, sway: 0.08 });
     const PI = (stacked) => P({ x: stacked ? 0 : -0.27, y: stacked ? 0.24 : 0.05, theta: 0.35, phi: 1.46, r: stacked ? 150 : 128, sway: 0.25 });
     Object.assign(inst, {
       pose(_, stacked) {
