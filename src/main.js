@@ -247,13 +247,13 @@ async function enterScan() {
     console.warn(err);
     $('#scanIdle').style.display = 'none';
     swapText($('#scanTitle'), 'Caméra indisponible');
-    $('#scanHint').textContent = 'Autorisez la caméra dans le navigateur, ou importez jusqu’à cinq photos : face, trois-quarts et profils.';
+    $('#scanHint').textContent = 'Autorisez la caméra dans le navigateur, ou importez des photos de votre tête sous plusieurs angles : face, trois-quarts, profils, dessus.';
   }
 }
 function stopScan() { state.scanAbort?.abort(); state.scanAbort = null; const v = $('#video'); v.srcObject?.getTracks?.().forEach((t) => t.stop()); v.srcObject = null; }
 
 $('#photoInput').addEventListener('change', async (e) => {
-  const files = [...(e.target.files || [])].slice(0, 5); e.target.value = '';
+  const files = [...(e.target.files || [])].slice(0, 30); e.target.value = '';
   if (!files.length) return;
   stopScan();
   $('#scanIdle').style.display = '';

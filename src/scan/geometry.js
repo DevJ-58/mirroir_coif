@@ -88,6 +88,12 @@ export function makeView(pose) {
   };
 }
 
+/** Angle de tangage (degrés) : négatif tête baissée, positif menton levé. */
+export function pitchOf(pose) {
+  const f = mulV(pose.R, [0, 0, 1]);
+  return (Math.atan2(-f[1], Math.hypot(f[0], f[2])) * 180) / Math.PI;
+}
+
 /** Angle de lacet (degrés) d'une vue : positif quand la tête tourne vers la droite de l'image. */
 export function yawOf(pose) {
   // la direction « avant » du visage (+z du modèle) exprimée dans le repère caméra

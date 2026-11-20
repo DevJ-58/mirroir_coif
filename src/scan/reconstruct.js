@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import { ImageSegmenter } from '@mediapipe/tasks-vision';
 import { similarity, makeView, yawOf } from './geometry.js';
-import { canonicalVerts, FACE_TRIS, HC, insideHead, setSkullScale, headProfile, HEAD_TOP } from '../three/head.js';
+import { canonicalVerts, FACE_TRIS, HC, insideHead, setSkullScale, setHeadShape, baseHeadProfile, headProfile, HEAD_TOP } from '../three/head.js';
 import { getFileset } from './scanner.js';
 
 // classes du modèle « selfie multiclass »
@@ -42,7 +42,7 @@ function canonicalNormals(V) {
 }
 
 /**
- * captures : [{ canvas, landmarks, width, height }] (1 à 5 prises, la première de face de préférence)
+ * captures : [{ canvas, landmarks, width, height }] (1 à ~30 prises, la première de face de préférence)
  * Renvoie l'objet « scan » utilisé par l'avatar.
  */
 export async function reconstruct(captures, onStep = () => {}) {
@@ -51,6 +51,8 @@ export async function reconstruct(captures, onStep = () => {}) {
 
   // ---------- 1. pose de chaque prise ----------
   onStep(0);
+  setSkullScale(1);
+  setHeadShape(null);
   const views = captures.map((cap) => {
     const W = cap.width, H = cap.height;
     const O = new Float32Array(468 * 3);
@@ -114,15 +116,17 @@ export async function reconstruct(captures, onStep = () => {}) {
   await nextFrame();
   const G = { x0: -14, y0: -9, z0: -24, s: 0.5, nx: 56, ny: 68, nz: 76 };
   const occ = new Uint8Array(G.nx * G.ny * G.nz);
+  const tolerate = views.length >= 12 ? 1 : 0;
   const headClass = (c) => c === HAIR || c === FACE || c === BODY || c === OTHER || c === -1;
   for (let k = 0; k < G.nz; k++) for (let j = 0; j < G.ny; j++) for (let i = 0; i < G.nx; i++) {
     const p = [G.x0 + (i + 0.5) * G.s, G.y0 + (j + 0.5) * G.s, G.z0 + (k + 0.5) * G.s];
     // dans la tête si aucune vue ne voit du fond à cet endroit, et qu'au moins deux vues
     // (ou la seule disponible) y voient vraiment la tête ; hors cadre = inconnu
-    let inside = true, seenBy = 0;
+    // avec beaucoup de vues, un masque isolé qui se trompe ne doit pas creuser la tête
+    let inside = true, seenBy = 0, miss = 0;
     for (const v of views) {
       const q = v.project(p); const c = classAt(v, q[0], q[1]);
-      if (!headClass(c)) { inside = false; break; }
+      if (!headClass(c)) { if (++miss > tolerate) { inside = false; break; } continue; }
       if (c !== -1) seenBy++;
     }
     occ[(k * G.ny + j) * G.nx + i] = inside && seenBy >= Math.min(2, views.length) ? 1 : 0;
@@ -148,29 +152,94 @@ export async function reconstruct(captures, onStep = () => {}) {
     const el = E0 + ((E1 - E0) * e) / (NE - 1), az = -Math.PI + (2 * Math.PI * a) / NA;
     const d = [Math.cos(el) * Math.sin(az), Math.sin(el), Math.cos(el) * Math.cos(az)];
     // bord de l'enveloppe le long du rayon (on tolère de petits trous de masque jusqu'à 1,5 cm)
-    let r = 0;
+    // r0 : première sortie (la surface sous une mèche qui surplombe)
+    // (les petits trous du masque près du centre sont ignorés : r0 n'est retenu qu'au-delà de 5 cm
+    // et seulement si un vrai vide d'au moins 1 cm suit)
+    let r = 0, r0 = 0, open = true;
     for (let t = 2; t < 28; t += 0.25) {
       const o = occAt([hc[0] + d[0] * t, hc[1] + d[1] * t, hc[2] + d[2] * t]);
-      if (o) r = t; else if (r > 0 && t - r > 1.5) break;
+      if (o) { if (open && (t - r <= 1 || t < 5)) r0 = t; else open = false; r = t; } else if (r > 0 && t - r > 1.5) break;
     }
     const v = bestView(d);
     let cls = -1;
     if (v && r > 0) { const q = v.project([hc[0] + d[0] * r, hc[1] + d[1] * r, hc[2] + d[2] * r]); cls = classAt(v, q[0], q[1]); }
-    dirs.push({ d, el, az, hull: r, skull: skullR(d), cls, seen: Boolean(v) });
+    let cls0 = cls;
+    if (v && r0 > 0 && r0 < r) { const q = v.project([hc[0] + d[0] * r0, hc[1] + d[1] * r0, hc[2] + d[2] * r0]); cls0 = classAt(v, q[0], q[1]); }
+    // la vue qui voit ce point « de profil » est celle dont la silhouette le fixe :
+    // si c'est une mèche qui fait ce bord, le point n'est pas une mesure du crâne
+    if (r0 > 0 && cls0 !== HAIR) {
+      let tv = null, tf = 0.35;
+      for (const w of views) { const f = Math.abs(w.facing(d)); if (f < tf) { tf = f; tv = w; } }
+      if (tv) { const q = tv.project([hc[0] + d[0] * (r0 - 0.4), hc[1] + d[1] * (r0 - 0.4), hc[2] + d[2] * (r0 - 0.4)]); if (classAt(tv, q[0], q[1]) === HAIR) cls0 = HAIR; }
+    }
+    dirs.push({ d, el, az, hull: r, hull0: r0, cls0, skull: skullR(d), cls, seen: Boolean(v) });
   }
 
-  // échelle du crâne : sur les tempes et au-dessus des oreilles (peau visible), l'enveloppe colle au crâne ;
-  // le visage est exclu (nez, joues dépassent du crâne)
-  const ratios = dirs.filter((x) => (x.cls === FACE || x.cls === BODY) && x.hull > 0 && x.el > -0.02 * Math.PI && x.el < 0.22 * Math.PI && Math.abs(Math.sin(x.az)) > 0.75).map((x) => x.hull / x.skull).sort((a, b) => a - b);
-  // l'enveloppe vue sous 5 angles surestime les flancs : la correction reste prudente
-  const med = ratios.length > 8 ? ratios[Math.floor(ratios.length / 2)] : 1;
-  const k = Math.min(1.05, Math.max(0.96, 1 + (med - 1) * 0.35));
-  setSkullScale(k);
+  // ---------- forme de toute la tête ----------
+  // Par tranche de hauteur, on compare l'enveloppe mesurée au modèle générique : largeur (côtés)
+  // et profondeur (arrière du crâne). Là où la peau est visible (tempes, oreilles, nuque dégagée)
+  // l'enveloppe colle au crâne ; sous les cheveux on retire une épaisseur prudente et on garde
+  // un quantile bas pour ne pas confondre volume de coiffure et crâne.
+  const BY0 = -9, BDY = 1.5, NB = 16;
+  const side = Array.from({ length: NB }, () => ({ skin: [], hair: [] }));
+  const back = Array.from({ length: NB }, () => ({ skin: [], hair: [] }));
+  const prof = { rx: 0, c: 0, rz: 0 };
+  for (const x of dirs) {
+    if (!(x.hull0 > 0) || !x.seen || x.cls0 === -1) continue;
+    const isHair = x.cls0 === HAIR;
+    // l'enveloppe majore toujours la surface (voxels de 5 mm) : on retire un demi-voxel
+    const r = Math.max(0, x.hull0 - 0.25);
+    const p = [hc[0] + x.d[0] * r, hc[1] + x.d[1] * r, hc[2] + x.d[2] * r];
+    if (p[1] < BY0 || p[1] > 12.4) continue;
+    baseHeadProfile(p[1], prof);
+    const ratio = Math.hypot(p[0] / prof.rx, (p[2] - prof.c) / prof.rz);
+    if (!(ratio > 0.8 && ratio < 1.6)) continue;
+    const bi = Math.min(NB - 1, Math.max(0, Math.round((p[1] - BY0) / BDY)));
+    const sa = Math.sin(x.az), ca = Math.cos(x.az);
+    const bucket = Math.abs(sa) > 0.8 ? side[bi] : ca < -0.75 ? back[bi] : null;
+    if (bucket) (isHair ? bucket.hair : bucket.skin).push(ratio);
+  }
+  const q = (arr, f) => { const a = arr.slice().sort((m, n) => m - n); return a[Math.min(a.length - 1, Math.floor(a.length * f))]; };
+  const band = (B, lo, hi) => {
+    const out = new Float32Array(NB).fill(NaN);
+    // peau visible : mesure directe du crâne
+    B.forEach((b, i) => { if (b.skin.length >= 3) out[i] = Math.min(hi, Math.max(lo, q(b.skin, 0.5))); });
+    // trous comblés par les voisins, puis lissage
+    for (let i = 0; i < NB; i++) if (Number.isNaN(out[i])) {
+      let l = i - 1, r = i + 1;
+      while (l >= 0 && Number.isNaN(out[l])) l--;
+      while (r < NB && Number.isNaN(out[r])) r++;
+      out[i] = l >= 0 && r < NB ? out[l] + ((out[r] - out[l]) * (i - l)) / (r - l) : l >= 0 ? out[l] : r < NB ? out[r] : 1;
+    }
+    // sous les cheveux l'épaisseur est inconnue, mais l'enveloppe reste une borne haute :
+    // le crâne ne peut qu'y être plus petit
+    B.forEach((b, i) => { if (b.skin.length < 3 && b.hair.length >= 3) out[i] = Math.max(lo, Math.min(out[i], q(b.hair, 0.1))); });
+    for (let pass = 0; pass < 3; pass++) { const c = out.slice(); for (let i = 0; i < NB; i++) out[i] = (c[Math.max(0, i - 1)] + 2 * c[i] + c[Math.min(NB - 1, i + 1)]) / 4; }
+    return out;
+  };
+  const shape = { y0: BY0, dy: BDY, kx: band(side, 0.9, 1.12), kz: band(back, 0.9, 1.1) };
+  setSkullScale(1);
+  setHeadShape(shape);
+  const k = 1;
   for (const x of dirs) x.skull = skullR(x.d);
 
   // épaisseur de cheveux par direction (lissée)
   const thick = new Float32Array(dirs.length);
-  dirs.forEach((x, i) => { thick[i] = x.cls === HAIR && x.hull > 0 ? Math.max(0, x.hull - x.skull) : 0; });
+  const crownVolume = () => {
+    dirs.forEach((x, i) => { thick[i] = x.cls === HAIR && x.hull > 0 ? Math.max(0, x.hull - x.skull) : 0; });
+    const c = dirs.map((x, i) => [x, thick[i]]).filter(([x]) => x.el > 0.2 * Math.PI && x.cls === HAIR).map(([, t]) => t).sort((a, b) => a - b);
+    return c.length ? c[Math.floor(c.length * 0.6)] : 0;
+  };
+  let volume = crownVolume();
+  // chevelure épaisse : le crâne est caché et les bords mesurés sont surtout des mèches,
+  // la forme mesurée est alors fortement atténuée vers la tête de référence
+  const damp = Math.min(1, Math.max(0.25, 1 - (volume - 1.2) / 2.2));
+  if (damp < 1) {
+    for (const key of ['kx', 'kz']) shape[key] = shape[key].map((v) => 1 + (v - 1) * damp);
+    setHeadShape(shape);
+    for (const x of dirs) x.skull = skullR(x.d);
+    volume = crownVolume();
+  }
   const hairW = new Float32Array(dirs.length);
   for (let pass = 0; pass < 2; pass++) {
     const src = pass ? hairW.slice() : Float32Array.from(dirs, (x) => (x.cls === HAIR ? 1 : 0));
@@ -183,8 +252,6 @@ export async function reconstruct(captures, onStep = () => {}) {
       hairW[e * NA + a] = s / n;
     }
   }
-  const crown = dirs.map((x, i) => [x, thick[i]]).filter(([x]) => x.el > 0.2 * Math.PI && x.cls === HAIR).map(([, t]) => t).sort((a, b) => a - b);
-  const volume = crown.length ? crown[Math.floor(crown.length * 0.6)] : 0;
   // longueur : point le plus bas couvert de cheveux à l'arrière et sur les côtés
   let lowest = HEAD_TOP;
   dirs.forEach((x, i) => { if (hairW[i] > 0.5 && Math.cos(x.az) < 0.3) lowest = Math.min(lowest, hc[1] + x.d[1] * x.hull); });
@@ -274,7 +341,7 @@ export async function reconstruct(captures, onStep = () => {}) {
   const hairShare = dirs.filter((x, i) => x.el > 0 && hairW[i] > 0.5).length / Math.max(1, dirs.filter((x) => x.el > 0).length);
 
   return {
-    verts, skin, skullScale: k, views: views.length, 
+    verts, skin, skullScale: k, shape, views: views.length,
     hair: { volume, length, share: hairShare },
     colorizeHead,
     buildHairShell,

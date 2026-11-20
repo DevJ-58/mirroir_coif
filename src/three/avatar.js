@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { buildHeadGeometry, canonicalVerts, capeProfile, CAPE_C, setSkullScale } from './head.js';
+import { buildHeadGeometry, canonicalVerts, capeProfile, CAPE_C, setSkullScale, setHeadShape, headProfile } from './head.js';
 
 const MANNEQUIN = new THREE.Color('#cdbfb0');
 
@@ -27,12 +27,14 @@ export class Avatar {
     earGeo.setAttribute('aFace', new THREE.BufferAttribute(new Float32Array(earGeo.attributes.position.count), 1));
     earGeo.setAttribute('aUv', new THREE.BufferAttribute(new Float32Array(earGeo.attributes.position.count * 2), 2));
     earGeo.setAttribute('aCol', new THREE.BufferAttribute(new Float32Array(earGeo.attributes.position.count * 3), 3));
-    for (const s of [-1, 1]) {
+    this.ears = [-1, 1].map((s) => {
       const ear = new THREE.Mesh(earGeo, this.skinMat);
       ear.position.set(s * 7.75, 1.0, -4.4);
       ear.rotation.set(-0.12, s * 0.32, s * -0.06);
+      ear.userData.side = s;
       this.group.add(ear);
-    }
+      return ear;
+    });
     this.currentHair = null; // cheveux réels de la personne scannée
     this.hairShown = true;
 
@@ -92,8 +94,17 @@ export class Avatar {
     return m;
   }
 
+  /** Oreilles posées sur la surface de la tête (générique ou mesurée). */
+  _placeEars() {
+    const p = headProfile(1.0), w = (-4.4 - p.c) / p.rz;
+    const x = p.rx * Math.sqrt(Math.max(0.05, 1 - w * w));
+    for (const ear of this.ears) ear.position.x = ear.userData.side * (x + 0.08);
+  }
+
   setMannequin() {
     setSkullScale(1);
+    setHeadShape(null);
+    this._placeEars();
     this._setCurrentHair(null);
     this.scan = null;
     this.uniforms.uHasCol.value = 0;
@@ -109,6 +120,8 @@ export class Avatar {
   setScan(scan) {
     this.scan = scan;
     setSkullScale(scan.skullScale);
+    setHeadShape(scan.shape);
+    this._placeEars();
     // maillage plus fin : les couleurs sont portées par les sommets
     const g = buildHeadGeometry(scan.verts, null, { NT: 380, NY: 420 });
     scan.colorizeHead(g);

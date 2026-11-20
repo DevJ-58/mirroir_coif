@@ -36,6 +36,19 @@ let SKULL = 1;
 export function setSkullScale(k) { SKULL = Math.min(1.2, Math.max(0.85, k || 1)); }
 export function getSkullScale() { return SKULL; }
 /** Section horizontale de la tête à la hauteur y : ellipse (rx, rz) centrée en z = c. */
+// Forme mesurée par le scan : par tranche de hauteur, largeur (kx) et profondeur arrière (kz).
+// null = tête générique.
+let SHAPE = null;
+/** shape : { y0, dy, kx: Float32Array, kz: Float32Array } ou null */
+export function setHeadShape(shape) { SHAPE = shape || null; }
+export function getHeadShape() { return SHAPE; }
+const shapeAt = (arr, y) => {
+  const f = (y - SHAPE.y0) / SHAPE.dy, n = arr.length;
+  if (f <= 0) return arr[0];
+  if (f >= n - 1) return arr[n - 1];
+  const i = Math.floor(f), t = f - i;
+  return arr[i] + (arr[i + 1] - arr[i]) * t;
+};
 export function headProfile(y, out = _prof) {
   baseProfile(y, out);
   if (SKULL !== 1) {
@@ -43,8 +56,18 @@ export function headProfile(y, out = _prof) {
     const k = 1 + (SKULL - 1) * t * t * (3 - 2 * t);
     out.rx *= k; out.rz *= k;
   }
+  if (SHAPE) {
+    // la mâchoire et le cou restent ceux du modèle : la forme mesurée entre en douceur sous le menton
+    const t = Math.min(1, Math.max(0, (y + 9) / 4)), w = t * t * (3 - 2 * t);
+    const kx = 1 + (shapeAt(SHAPE.kx, y) - 1) * w, kz = 1 + (shapeAt(SHAPE.kz, y) - 1) * w;
+    // l'avant (front, visage) reste en place, seul l'arrière du crâne avance ou recule
+    const front = out.c + out.rz;
+    out.rx *= kx; out.rz *= kz; out.c = front - out.rz;
+  }
   return out;
 }
+/** Section du modèle générique (sans forme mesurée). */
+export function baseHeadProfile(y, out = { rx: 0, c: 0, rz: 0 }) { return baseProfile(y, out); }
 function baseProfile(y, out) {
   if (y > 8.3) {
     // dôme crânien analytique
