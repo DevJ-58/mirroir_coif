@@ -8,6 +8,7 @@ import { STYLES, CATEGORIES, COLORS } from './data/catalog.js';
 import { runVideoScan, scanImage, sampleSkin, loadLandmarker } from './scan/scanner.js';
 import { initCursor, initMagnetic, setCursor } from './ui/cursor.js';
 import { createSite, curtain } from './site/site.js';
+import { initExtras } from './studio/extras.js';
 
 if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
 window.scrollTo(0, 0);
@@ -350,6 +351,33 @@ function buildPanel() {
 }
 buildPanel();
 
+function toast(text) {
+  const t = $('#toast');
+  t.textContent = text;
+  t.classList.add('is-on');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => t.classList.remove('is-on'), 2400);
+}
+
+const extras = initExtras({ stage, hair, state, STYLES, select: (s, f) => select(s, f), toast, onReset: () => resetSession() });
+
+/** Fin de séance (mode borne) : on efface le scan et on revient au début du site. */
+function resetSession() {
+  if ($('#modal').classList.contains('is-on')) closeModal();
+  stopPresent();
+  extras.setCompare(false);
+  extras.clearFavs();
+  stopScan();
+  if (state.scanned) { avatar.setMannequin(); avatar.scan = null; state.scanned = false; renderThumbs(); }
+  state.selected = STYLES[0];
+  curtain(async () => {
+    stage.controls.enabled = false; stage.controls.autoRotate = false;
+    $('[data-action="rotate"]').classList.remove('is-on');
+    site.lenis.scrollTo(0, { immediate: true, force: true });
+    enterSite();
+  });
+}
+
 // Vignettes rendues hors écran, une par image, sans perturber la scène affichée.
 async function renderThumbs() {
   const cam = new THREE.PerspectiveCamera(30, 1, 1, 1000);
@@ -358,6 +386,7 @@ async function renderThumbs() {
   const thumbs = {};
   for (const s of STYLES) {
     const h = hair.get(s);
+    await stage.inFrame(() => {
     // état courant sauvegardé
     const saved = [...hair.cache.values()].map((x) => [x, x.group.visible, x.common.uGrow.value, x.group.position.y, x.group.scale.x]);
     const rot = stage.root.rotation.clone(), py = stage.root.position.y, rev = avatar.uniforms.uReveal.value;
@@ -367,9 +396,9 @@ async function renderThumbs() {
     thumbs[s.id] = stage.renderThumb(cam, 280);
     for (const [x, v, g, y, sc] of saved) { x.group.visible = v; x.common.uGrow.value = g; x.group.position.y = y; x.group.scale.setScalar(sc); }
     stage.root.rotation.copy(rot); stage.root.position.y = py; avatar.uniforms.uReveal.value = rev;
+    });
     const img = $(`.card[data-id="${s.id}"] img`);
     if (img) { img.src = thumbs[s.id]; img.classList.add('ready'); img.previousElementSibling?.remove(); }
-    await nextFrame();
   }
   site.setThumbs(thumbs);
 }
@@ -403,7 +432,7 @@ function select(style, force = false) {
   const changed = state.selected !== style;
   state.selected = style;
   $$('.card').forEach((c) => c.classList.toggle('is-selected', c.dataset.id === style.id));
-  if (state.compare) setCompare(false);
+  extras.onSelect();
   hair.show(style, 'drop');
   setBigTitle(style.name);
   if (changed || force) updateDetails(style);
@@ -427,13 +456,12 @@ cardsEl.addEventListener('pointerover', (e) => {
   clearTimeout(hoverTimer);
   const s = STYLES.find((x) => x.id === card.dataset.id);
   if (state.presenting) return;
-  if (state.compare) setCompare(false);
   if (hair.current !== s.id) { hair.show(s, 'drop'); setBigTitle(s.name); }
 });
 cardsEl.addEventListener('pointerleave', () => {
   clearTimeout(hoverTimer);
   hoverTimer = setTimeout(() => {
-    if (state.presenting || state.compare) return;
+    if (state.presenting) return;
     if (hair.current !== state.selected.id) { hair.show(state.selected, 'drop'); setBigTitle(state.selected.name); }
   }, 280);
 });
@@ -498,12 +526,7 @@ function setLook(look, animate = true) {
 }
 $('#lookSeg').addEventListener('click', (e) => { const b = e.target.closest('.seg__btn'); if (b) setLook(b.dataset.look); });
 
-function setCompare(on) {
-  state.compare = on;
-  $('[data-action="compare"]').classList.toggle('is-on', on);
-  if (on) { hair.hideAll(0.6); setBigTitle('Avant'); }
-  else { hair.show(state.selected, 'grow'); setBigTitle(state.selected.name); }
-}
+function setCompare(on) { extras.setCompare(on); }
 
 // ---------- présentation cinématique ----------
 function present() {
@@ -554,9 +577,33 @@ function stopPresent() {
 }
 
 // ---------- réservation ----------
+/** Fiche image : rendu 3D sur fond sombre + nom du style, prête à enregistrer. */
+function composeShot(url, s) {
+  const src = stage.renderer.domElement;
+  const c = document.createElement('canvas');
+  c.width = src.width; c.height = src.height;
+  const g = c.getContext('2d');
+  const grad = g.createRadialGradient(c.width * 0.5, c.height * 0.42, 0, c.width * 0.5, c.height * 0.42, c.width * 0.7);
+  grad.addColorStop(0, '#2a211b'); grad.addColorStop(1, '#0b0908');
+  g.fillStyle = grad; g.fillRect(0, 0, c.width, c.height);
+  g.drawImage(src, 0, 0);
+  const k = c.height / 900;
+  g.fillStyle = '#f4ede3';
+  g.font = `${Math.round(64 * k)}px "Bodoni Moda", serif`;
+  g.fillText(s.name, 48 * k, c.height - 84 * k);
+  g.fillStyle = '#e9cf9f';
+  g.font = `${Math.round(16 * k)}px "Inter Tight", sans-serif`;
+  g.fillText(`MIROIR · ${s.duration} · ${s.price} FCFA · ${state.color.name}`.toUpperCase(), 50 * k, c.height - 46 * k);
+  void url;
+  return c.toDataURL('image/png');
+}
 function book() {
   const s = state.selected;
-  $('#modalShot').src = stage.snapshot();
+  const raw = stage.snapshot();
+  const shot = composeShot(raw, s);
+  $('#modalShot').src = raw;
+  $('#saveShot').href = shot;
+  $('#saveShot').download = `miroir-${s.id}.png`;
   $('#modalTitle').textContent = s.name;
   $('#modalMeta').textContent = `${s.duration} · ${s.price} FCFA · ${state.color.name}`;
   const m = $('#modal');

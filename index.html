@@ -10,6 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400..700;1,6..96,400..700&family=Inter+Tight:wght@300;400;500;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/src/style.css" />
   <link rel="stylesheet" href="/src/site.css" />
+  <link rel="stylesheet" href="/src/studio.css" />
 </head>
 <body data-screen="loader" class="is-loading">
   <!-- arrière-plan -->
@@ -321,7 +322,10 @@
         <div><span>Tarif</span><b><span id="dPrice">—</span> <small>FCFA</small></b></div>
         <div><span>Teinte</span><b id="dColor">Noir ébène</b></div>
       </div>
-      <button class="btn btn--primary btn--sm magnetic" data-action="book"><span class="btn__bg"></span><span class="btn__label">Réserver ce style</span><span class="btn__arrow">→</span></button>
+      <div class="details__actions">
+        <button class="btn btn--primary btn--sm magnetic" data-action="book"><span class="btn__bg"></span><span class="btn__label">Réserver ce style</span><span class="btn__arrow">→</span></button>
+        <button class="favbtn" data-action="fav" aria-pressed="false" title="Ajouter aux favoris"><svg viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg></button>
+      </div>
     </article>
 
     <aside class="panel" id="panel">
@@ -343,11 +347,19 @@
     <nav class="toolbar" id="toolbar" aria-label="Contrôles de l'avatar">
       <button class="tool" data-action="rotate" title="Rotation automatique"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v4h-4"/></svg><span>Rotation</span></button>
       <button class="tool tool--hero" data-action="present" title="Présentation"><svg viewBox="0 0 24 24"><path d="M8 5.5v13l10.5-6.5z"/></svg><span>Présentation</span></button>
-      <button class="tool" data-action="compare" title="Avant / après"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 4v16" /><path d="M12 4a8 8 0 0 1 0 16z" class="fill"/></svg><span>Avant/Après</span></button>
+      <button class="tool" data-action="compare" title="Comparer avant / après"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 4v16" /><path d="M12 4a8 8 0 0 1 0 16z" class="fill"/></svg><span>Avant/Après</span></button>
+      <button class="tool" data-action="favs" title="Comparer mes favoris"><svg viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg><span>Favoris</span><b class="tool__badge" id="favCount">0</b></button>
       <button class="tool" data-action="recenter" title="Recentrer"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg><span>Recentrer</span></button>
       <button class="tool" data-action="scan" title="Nouveau scan"><svg viewBox="0 0 24 24"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3"/></svg><span>Scanner</span></button>
     </nav>
 
+    <div class="split" id="split" hidden>
+      <div class="split__line" id="splitLine">
+        <span class="split__tag split__tag--l">Avant</span>
+        <span class="split__tag split__tag--r">Après</span>
+        <button class="split__handle" id="splitHandle" aria-label="Faire glisser pour comparer avant et après"><svg viewBox="0 0 24 24"><path d="M9 7l-5 5 5 5M15 7l5 5-5 5"/></svg></button>
+      </div>
+    </div>
     <div class="hint-drag" id="hintDrag"><span class="hint-drag__icon"></span>Faites glisser pour tourner l’avatar</div>
   </section>
 
@@ -375,9 +387,33 @@
         <p class="modal__text">Montrez cet écran à votre coiffeur·se : le style, la teinte et votre avatar sont enregistrés pour la séance.</p>
         <div class="cta-row">
           <button class="btn btn--primary btn--sm" data-action="close-modal"><span class="btn__bg"></span><span class="btn__label">Confirmer au salon</span></button>
+          <a class="btn btn--ghost btn--sm" id="saveShot" download="miroir-essayage.png" href="#"><span class="btn__label">Enregistrer l’image</span></a>
           <button class="btn btn--ghost btn--sm" data-action="close-modal"><span class="btn__label">Continuer à essayer</span></button>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- comparaison des favoris -->
+  <div class="favs" id="favs" aria-hidden="true">
+    <div class="favs__backdrop" data-action="close-favs"></div>
+    <div class="favs__panel">
+      <div class="favs__head">
+        <div><p class="panel__k">Vos favoris</p><h3 class="favs__title">Côte à <em>côte.</em></h3></div>
+        <button class="link-btn" data-action="close-favs">Fermer ✕</button>
+      </div>
+      <div class="favs__grid" id="favsGrid"></div>
+    </div>
+  </div>
+
+  <!-- veille (mode borne) -->
+  <div class="idle" id="idle" aria-hidden="true">
+    <div class="idle__card">
+      <svg class="idle__ring" viewBox="0 0 120 120"><circle cx="60" cy="60" r="54" class="idle__track"/><circle cx="60" cy="60" r="54" class="idle__prog" id="idleProg"/></svg>
+      <span class="idle__count" id="idleCount">10</span>
+      <h3 class="idle__title">Toujours là ?</h3>
+      <p class="idle__text">Sans action de votre part, la séance se ferme et votre scan est effacé de l’appareil.</p>
+      <button class="btn btn--primary btn--sm" data-action="idle-stay"><span class="btn__bg"></span><span class="btn__label">Je continue</span></button>
     </div>
   </div>
 

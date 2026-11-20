@@ -94,11 +94,29 @@ export class Stage {
 
   onTick(fn) { this.updaters.add(fn); return () => this.updaters.delete(fn); }
 
+  /** Exécute fn au début de la prochaine image, avant le rendu principal (aucun clignotement). */
+  inFrame(fn) {
+    return new Promise((resolve, reject) => (this._jobs ||= []).push({ fn, resolve, reject }));
+  }
+
   _tick() {
+    const job = this._jobs?.shift();
+    if (job) { try { job.resolve(job.fn()); } catch (e) { job.reject(e); } }
     const dt = Math.min(this.clock.getDelta(), 0.05), t = this.clock.elapsedTime;
     for (const fn of this.updaters) fn(dt, t);
     if (this.controls.enabled || this.controls.autoRotate) this.controls.update();
     this.renderer.render(this.scene, this.camera);
+    // comparateur avant/après : la partie gauche est re-rendue sans la coiffure
+    const sp = this.split;
+    if (sp && sp.x > 0.001) {
+      const r = this.renderer, w = window.innerWidth, h = window.innerHeight;
+      sp.hide();
+      r.setScissorTest(true);
+      r.setScissor(0, 0, Math.round(sp.x * w), h);
+      r.render(this.scene, this.camera);
+      r.setScissorTest(false);
+      sp.show();
+    }
   }
 
   /** Rendu hors écran (vignettes). */
