@@ -669,6 +669,24 @@ function swapText(el, text) {
 function wait(ms) { return new Promise((r) => setTimeout(r, ms)); }
 function nextFrame() { return new Promise((r) => { requestAnimationFrame(() => r()); setTimeout(r, 60); }); }
 
+// ---------- thème clair / sombre ----------
+function setTheme(t, save = true) {
+  const root = document.documentElement;
+  root.classList.add('theme-switching');
+  root.dataset.theme = t;
+  $('meta[name="theme-color"]').setAttribute('content', t === 'light' ? '#EFE8DE' : '#0B0908');
+  if (save) { try { localStorage.setItem('garo-theme', t); } catch (e) { /* stockage indisponible */ } }
+  setTimeout(() => root.classList.remove('theme-switching'), 700);
+}
+setTheme(document.documentElement.dataset.theme || 'dark', false);
+$('#themeToggle').addEventListener('click', () => setTheme(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light'));
+// sans choix enregistré, on suit le réglage du système
+window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', (e) => {
+  let saved = null;
+  try { saved = localStorage.getItem('garo-theme'); } catch (err) { /* ignoré */ }
+  if (!saved) setTheme(e.matches ? 'light' : 'dark', false);
+});
+
 initCursor();
 initMagnetic();
 boot();

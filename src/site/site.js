@@ -29,7 +29,7 @@ function poses() {
     coll: { x: 0, y: p ? -0.06 : -0.04, theta: 0.28, phi: 1.44, r: p ? 136 : 124, ty: 0, sway: 0.2 },
     r360: { x: 0, y: p ? -0.02 : 0, theta: 0, phi: 1.36, r: p ? 132 : 100, ty: 0, sway: 0 },
     colors: { x: p ? 0 : -0.19, y: p ? 0.04 : 0, theta: 0.75, phi: 1.36, r: p ? 130 : 94, ty: 0, sway: 0.3 },
-    final: { x: 0, y: p ? 0.26 : 0.3, theta: 0, phi: 1.5, r: p ? 120 : 104, ty: 0, sway: 1 },
+    final: { x: 0, y: p ? 0.34 : 0.42, theta: 0, phi: 1.5, r: p ? 120 : 104, ty: 0, sway: 1 },
   };
 }
 const KEYS = ['x', 'y', 'theta', 'phi', 'r', 'ty', 'sway'];
@@ -335,36 +335,85 @@ export function createSite({ stage, avatar, hair, STYLES, COLORS, mouse, onTry }
     onUpdate: (self) => applyColor(Math.min(COLORS.length - 1, Math.floor(self.progress * COLORS.length))),
   });
 
-  // ---------- salons : ouverture en volet + écrans vivants ----------
-  gsap.fromTo('.salons-inner', { clipPath: 'inset(16% 6% 0% 6% round 48px)' }, {
-    clipPath: 'inset(0% 0% 0% 0% round 0px)', ease: 'none',
-    scrollTrigger: { trigger: '#salons', start: 'top bottom', end: 'top 5%', scrub: 1 },
-  });
+  // ---------- salons : un seul écran qui se transforme (tablette → TV → borne) ----------
+  const sv = $('#svDevice'), svSteps = $$('#svSteps li'), svCap = $('#svCaption');
+  // format de chaque appareil : largeur/hauteur (fraction de la scène), arrondi, cadre
+  const FORMS = [
+    { w: 0.44, h: 0.82, ar: 3 / 4, r: 30, b: 14, cap: 'Tablette · au fauteuil' },
+    { w: 1, h: 0.72, ar: 16 / 9, r: 10, b: 10, cap: 'Écran TV · en vitrine' },
+    { w: 0.36, h: 0.92, ar: 9 / 16, r: 22, b: 14, cap: 'Borne · en libre-service' },
+  ];
+  const svState = { form: -1 };
+  function layoutDevice(p) {
+    const box = sv.parentElement.getBoundingClientRect();
+    const f = Math.min(1.999, Math.max(0, p * 2.6 - 0.15));    // 0→2 sur la section
+    const i = Math.floor(f), k = easeIO(Math.min(1, Math.max(0, (f - i - 0.35) / 0.65)));
+    const A = FORMS[i], B = FORMS[Math.min(2, i + 1)];
+    const size = (F) => {
+      // la plus grande taille au bon ratio qui tient dans la scène
+      let h = box.height * F.h, w = h * F.ar;
+      if (w > box.width * F.w) { w = box.width * F.w; h = w / F.ar; }
+      return { w, h };
+    };
+    const a = size(A), b = size(B);
+    sv.style.width = `${a.w + (b.w - a.w) * k}px`;
+    sv.style.height = `${a.h + (b.h - a.h) * k}px`;
+    const rad = A.r + (B.r - A.r) * k, bw = A.b + (B.b - A.b) * k;
+    sv.style.borderRadius = `${rad}px`;
+    sv.style.borderWidth = `${bw}px`;
+    sv.style.setProperty('--r', `${Math.max(3, rad - bw)}px`);
+    sv.style.setProperty('--stand', String(i === 0 ? k : i === 1 ? 1 - k : 0));
+    sv.style.setProperty('--base', String(i === 1 ? k : i === 2 ? 1 : 0));
+    const cur = k > 0.5 ? Math.min(2, i + 1) : i;
+    if (cur !== svState.form) {
+      svState.form = cur;
+      svSteps.forEach((li, j) => li.classList.toggle('is-on', j === cur));
+      gsap.to(svCap, { opacity: 0, y: -8, duration: 0.2, onComplete: () => { svCap.textContent = FORMS[cur].cap; gsap.to(svCap, { opacity: 1, y: 0, duration: 0.5, ease: 'expo.out' }); } });
+    }
+  }
+  ScrollTrigger.create({ trigger: '#salons', start: 'top top', end: () => `+=${$('.salons-pin').offsetHeight * 2}`, onUpdate: (self) => layoutDevice(self.progress), onRefresh: (self) => layoutDevice(self.progress) });
+  window.addEventListener('resize', () => layoutDevice(0));
+
+  // l'écran fait défiler les coiffures, comme la cabine
+  let thumbList = [], screenTimer = null, screenIdx = 0;
+  function cycleScreens() {
+    if (!thumbList.length) return;
+    const imgs = $$('.sv-screen img');
+    const next = imgs.find((im) => !im.classList.contains('on')) || imgs[0];
+    const s = STYLES[screenIdx % STYLES.length];
+    next.src = thumbList[screenIdx % thumbList.length];
+    imgs.forEach((im) => im.classList.toggle('on', im === next));
+    const name = $('#svName');
+    gsap.to(name, { opacity: 0, y: -6, duration: 0.25, onComplete: () => { name.textContent = s.name; $('#svMeta').textContent = `${s.duration} · ${s.price} FCFA`; gsap.to(name, { opacity: 1, y: 0, duration: 0.5, ease: 'expo.out' }); } });
+    screenIdx++;
+  }
   ScrollTrigger.create({
-    trigger: '#salons', start: 'top 60px', end: 'bottom 60px',
-    onToggle: () => {},
+    trigger: '#salons', start: 'top bottom', end: 'bottom top',
+    onToggle: (self) => { clearInterval(screenTimer); if (self.isActive) { cycleScreens(); screenTimer = setInterval(cycleScreens, 2000); } },
   });
   $$('[data-count]').forEach((el) => {
     const to = +el.dataset.count;
     ScrollTrigger.create({
-      trigger: el, start: 'top 88%', once: true,
+      trigger: el, start: 'top 90%', once: true,
       onEnter: () => { const o = { v: 0 }; gsap.to(o, { v: to, duration: 2, ease: 'power3.out', onUpdate: () => (el.textContent = Math.round(o.v)) }); },
     });
   });
-  let thumbList = [], screenTimer = null, screenIdx = 0;
-  function cycleScreens() {
-    if (!thumbList.length) return;
-    $$('.dv__screen').forEach((scr, k) => {
-      const imgs = $$('img', scr);
-      const nextImg = imgs.find((im) => !im.classList.contains('on')) || imgs[0];
-      nextImg.src = thumbList[(screenIdx + k * 4) % thumbList.length];
-      imgs.forEach((im) => im.classList.toggle('on', im === nextImg));
-    });
-    screenIdx++;
-  }
-  ScrollTrigger.create({
-    trigger: '#devices', start: 'top bottom', end: 'bottom top',
-    onToggle: (self) => { clearInterval(screenTimer); if (self.isActive) { cycleScreens(); screenTimer = setInterval(cycleScreens, 1800); } },
+
+  // ---------- opacité du mannequin, calculée depuis le défilement ----------
+  const glFade = {
+    salIn: ScrollTrigger.create({ trigger: '#salons', start: 'top 85%', end: 'top 20%' }),
+    salOut: ScrollTrigger.create({ trigger: '#salons', start: 'bottom 90%', end: 'bottom 35%' }),
+    foot: ScrollTrigger.create({ trigger: '.footer', start: 'top bottom', end: 'top 40%' }),
+    maniIn: ScrollTrigger.create({ trigger: '#manifeste', start: 'top 70%', end: 'top 20%' }),
+    maniOut: ScrollTrigger.create({ trigger: '#processus', start: 'top 95%', end: 'top 45%' }),
+  };
+  const gl = $('#gl');
+  stage.onTick(() => {
+    if (!active) return;
+    let o = 1 - glFade.salIn.progress + glFade.salOut.progress;
+    o = Math.min(1, Math.max(0, o)) * (1 - 0.82 * glFade.foot.progress);
+    if (stacked()) o *= 1 - 0.8 * (glFade.maniIn.progress - glFade.maniOut.progress);
+    gl.style.opacity = o.toFixed(3);
   });
 
   // ---------- révélations génériques ----------
@@ -388,12 +437,6 @@ export function createSite({ stage, avatar, hair, STYLES, COLORS, mouse, onTry }
   const finalChars = splitChars($('.final-title [data-split]'));
   gsap.fromTo(finalChars, { yPercent: 120, rotate: 8 }, { yPercent: 0, rotate: 0, duration: 1.4, ease: 'expo.out', stagger: 0.05, scrollTrigger: { trigger: '.final-title', start: 'top 85%', toggleActions: 'play none none reverse' } });
   gsap.fromTo('.final-cta > *', { y: 30, opacity: 0 }, { y: 0, opacity: 1, duration: 1.1, ease: 'expo.out', stagger: 0.08, scrollTrigger: { trigger: '.final-cta', start: 'top 95%', toggleActions: 'play none none reverse' } });
-  gsap.fromTo('#gl', { opacity: 1 }, { opacity: 0.18, ease: 'none', immediateRender: false, scrollTrigger: { trigger: '.footer', start: 'top bottom', end: 'top 40%', scrub: true } });
-  // mise en page empilée : le mannequin s'efface derrière le texte du manifeste
-  gsap.matchMedia().add('(orientation: portrait), (max-width: 760px)', () => {
-    gsap.fromTo('#gl', { opacity: 1 }, { opacity: 0.2, ease: 'none', immediateRender: false, scrollTrigger: { trigger: '#manifeste', start: 'top 70%', end: 'top 20%', scrub: true } });
-    gsap.fromTo('#gl', { opacity: 0.2 }, { opacity: 1, ease: 'none', immediateRender: false, scrollTrigger: { trigger: '#processus', start: 'top 95%', end: 'top 45%', scrub: true } });
-  });
   // le logo du pied de page se dessine trait par trait
   const footStrokes = prepDraw($('.footer__logo'));
   gsap.to(footStrokes, { strokeDashoffset: 0, duration: 1.8, ease: 'power3.inOut', stagger: 0.06, scrollTrigger: { trigger: '.footer', start: 'top 92%', toggleActions: 'play none none reverse' } });
@@ -470,6 +513,11 @@ export function createSite({ stage, avatar, hair, STYLES, COLORS, mouse, onTry }
       this.enter();
       lenis.scrollTo(0, { immediate: true, force: true });
       ScrollTrigger.refresh();
+      // lien direct vers une section (#salons, #collection…), avec décalage optionnel ?off=px
+      if (location.hash && $(location.hash)) {
+        const off = +new URLSearchParams(location.search).get('off') || 0;
+        setTimeout(() => lenis.scrollTo(location.hash, { immediate: true, force: true, offset: off }), 400);
+      }
     },
     enter() {
       active = true;
