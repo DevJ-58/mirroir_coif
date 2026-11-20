@@ -9,6 +9,7 @@ import { runVideoScan, scanImage, sampleSkin, loadLandmarker } from './scan/scan
 import { initCursor, initMagnetic, setCursor } from './ui/cursor.js';
 import { createSite, curtain } from './site/site.js';
 import { initExtras } from './studio/extras.js';
+import { initPanel } from './studio/panel.js';
 
 if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
 window.scrollTo(0, 0);
@@ -359,6 +360,7 @@ function toast(text) {
   toast._t = setTimeout(() => t.classList.remove('is-on'), 2400);
 }
 
+const panelCtl = initPanel({ STYLES });
 const extras = initExtras({ stage, hair, state, STYLES, select: (s, f) => select(s, f), toast, onReset: () => resetSession() });
 
 /** Fin de séance (mode borne) : on efface le scan et on revient au début du site. */
@@ -413,8 +415,8 @@ function enterStudio() {
   seg.classList.toggle('is-disabled', !state.scanned);
   setLook(state.scanned && avatar.realistic ? 'real' : 'mannequin', false);
 
-  gsap.fromTo('#panel', { x: 80, opacity: 0, rotateY: -12 }, { x: 0, opacity: 1, rotateY: 0, duration: 1.6, ease: 'expo.out', delay: 0.2 });
-  gsap.fromTo('.card', { y: 40, opacity: 0 }, { y: 0, opacity: 1, duration: 1.1, ease: 'expo.out', stagger: 0.045, delay: 0.45 });
+  gsap.fromTo('.panel__head > *, .chips, .pager, .panel__foot', { opacity: 0, y: 20, filter: 'blur(10px)' }, { opacity: 1, y: 0, filter: 'blur(0px)', duration: 1.2, ease: 'expo.out', stagger: 0.08, delay: 0.25, clearProps: 'filter' });
+  setTimeout(() => panelCtl.intro(), 380);
   gsap.fromTo('#details > *', { y: 30, opacity: 0 }, { y: 0, opacity: 1, duration: 1.2, ease: 'expo.out', stagger: 0.07, delay: 0.35 });
   gsap.fromTo('#toolbar', { y: 40, opacity: 0 }, { y: 0, opacity: 1, duration: 1.2, ease: 'expo.out', delay: 0.6 });
   gsap.fromTo('.studio__left, #hintDrag', { opacity: 0 }, { opacity: 1, duration: 1, delay: 0.8 });
@@ -433,6 +435,7 @@ function select(style, force = false) {
   state.selected = style;
   $$('.card').forEach((c) => c.classList.toggle('is-selected', c.dataset.id === style.id));
   extras.onSelect();
+  panelCtl.reveal(style.id);
   hair.show(style, 'drop');
   setBigTitle(style.name);
   if (changed || force) updateDetails(style);
@@ -472,21 +475,7 @@ cardsEl.addEventListener('click', (e) => {
   state.selected = null;
   if (wasPreview) { hair.current = s.id; }
   select(s, true);
-  gsap.fromTo(card, { scale: 0.96 }, { scale: 1, duration: 0.8, ease: 'elastic.out(1, 0.5)' });
-});
-
-$('#chips').addEventListener('click', (e) => {
-  const chip = e.target.closest('.chip'); if (!chip) return;
-  $$('.chip').forEach((c) => c.classList.toggle('is-active', c === chip));
-  const cat = chip.dataset.cat;
-  const visible = [];
-  $$('.card').forEach((c) => {
-    const s = STYLES.find((x) => x.id === c.dataset.id);
-    const on = cat === 'all' || s.cat === cat;
-    c.classList.toggle('is-hidden', !on);
-    if (on) visible.push(c);
-  });
-  gsap.fromTo(visible, { y: 24, opacity: 0 }, { y: 0, opacity: 1, duration: 0.8, ease: 'expo.out', stagger: 0.04 });
+  gsap.fromTo(card.querySelector('.card__img'), { scale: 0.92 }, { scale: 1, duration: 0.9, ease: 'elastic.out(1, 0.5)' });
 });
 
 $('#swatches').addEventListener('click', (e) => {
@@ -497,16 +486,6 @@ $('#swatches').addEventListener('click', (e) => {
   hair.setColor(c.hex, c.tip);
   $('#dColor').textContent = c.name;
 });
-
-// lueur qui suit la souris dans le panneau verre
-const panel = $('#panel');
-panel.addEventListener('pointermove', (e) => {
-  const r = panel.getBoundingClientRect();
-  panel.style.setProperty('--mx', `${e.clientX - r.left}px`);
-  panel.style.setProperty('--my', `${e.clientY - r.top}px`);
-  panel.style.setProperty('--glow', '1');
-});
-panel.addEventListener('pointerleave', () => panel.style.setProperty('--glow', '0'));
 
 // réaliste / mannequin
 function setLook(look, animate = true) {

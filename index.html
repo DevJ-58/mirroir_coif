@@ -73,7 +73,8 @@
       </div>
       <h1 class="hero-title" aria-label="Voyez la coupe avant les ciseaux">
         <span class="ht ht--1" data-split>Voyez la coupe</span>
-        <span class="ht ht--2"><em data-split>avant</em> <span data-split>les ciseaux.</span></span>
+        <span class="ht ht--2"><em data-split>avant</em> <span data-split>les</span></span>
+        <span class="ht ht--3" data-split>ciseaux.</span>
       </h1>
       <div class="hero-bottom">
         <p class="hero-lede" data-hero>Un scan de quatre secondes, un avatar qui vous ressemble, toute la carte du salon portée à 360°.</p>
@@ -134,11 +135,12 @@
       <div class="coll-pin">
         <div class="coll-head">
           <p class="eyebrow"><span class="eyebrow__line"></span>04 — La collection</p>
-          <h2 class="h2" data-split-lines>Douze signatures,<br /><em>une seule séance.</em></h2>
+          <h2 class="h2" data-split-lines>Six signatures,<br /><em>une seule séance.</em></h2>
+          <button class="coll-all link-btn" data-action="mannequin">Voir les 12 styles en cabine →</button>
         </div>
         <div class="coll-name" id="collName" aria-hidden="true"></div>
         <div class="coll-track" id="collTrack"></div>
-        <div class="coll-progress"><span id="collIdx">01</span><i><b id="collBar"></b></i><span id="collTotal">12</span></div>
+        <div class="coll-progress"><span id="collIdx">01</span><i><b id="collBar"></b></i><span id="collTotal">06</span></div>
       </div>
     </section>
 
@@ -332,12 +334,17 @@
       <div class="panel__head">
         <div>
           <p class="panel__k">La collection</p>
-          <h3 class="panel__title">Survolez, <em>essayez.</em></h3>
+          <h3 class="panel__title">Survolez,<br /><em>essayez.</em></h3>
         </div>
         <span class="panel__count" id="panelCount">11</span>
       </div>
       <div class="chips" id="chips"></div>
       <div class="cards" id="cards"></div>
+      <div class="pager" id="pager">
+        <button class="pager__btn" data-page="-1" aria-label="Styles précédents"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
+        <span class="pager__idx"><b id="pgFrom">01</b><i></i><span id="pgTotal">12</span></span>
+        <button class="pager__btn" data-page="1" aria-label="Styles suivants"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>
+      </div>
       <div class="panel__foot">
         <p class="panel__k">Teinte</p>
         <div class="swatches" id="swatches"></div>

@@ -23,7 +23,7 @@ const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 function poses() {
   const p = stacked();
   return {
-    hero: { x: 0, y: p ? 0.12 : 0.04, theta: 0, phi: 1.5, r: p ? 122 : 98, ty: 0, sway: 1 },
+    hero: { x: p ? 0 : 0.25, y: p ? 0.1 : 0.03, theta: p ? 0 : -0.25, phi: 1.5, r: p ? 128 : 100, ty: 0, sway: 1 },
     mani: { x: p ? 0 : 0.3, y: p ? -0.24 : 0, theta: -1.0, phi: 1.42, r: p ? 150 : 116, ty: 0, sway: 0.35 },
     proc: { x: p ? 0 : -0.17, y: p ? -0.15 : 0, theta: 0.3, phi: 1.47, r: p ? 128 : 106, ty: 0, sway: 0.12 },
     coll: { x: 0, y: p ? -0.06 : -0.04, theta: 0.28, phi: 1.44, r: p ? 136 : 124, ty: 0, sway: 0.2 },
@@ -52,6 +52,8 @@ function splitLines(el) {
 
 export function createSite({ stage, avatar, hair, STYLES, COLORS, mouse, onTry }) {
   const byId = (id) => STYLES.find((s) => s.id === id);
+  // sélection courte pour la vitrine (la cabine présente tout le catalogue)
+  const FEAT = ['box-braids', 'cornrows', 'locks', 'afro', 'waves-fade', 'bun'].map(byId);
   const lenis = new Lenis({ duration: reduced ? 0.6 : 1.35, easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)), wheelMultiplier: 0.85, touchMultiplier: 1.4 });
   lenis.stop();
   lenis.on('scroll', ScrollTrigger.update);
@@ -77,6 +79,8 @@ export function createSite({ stage, avatar, hair, STYLES, COLORS, mouse, onTry }
   stage.onTick((dt, t) => {
     if (!active) return;
     stage.controls.enabled = false; stage.controls.autoRotate = false;
+    const T = targetPose(), f = 1 - Math.pow(0.012, dt);   // lissage indépendant de la cadence
+    for (const key of KEYS) pose[key] += (T[key] - pose[key]) * f;
     stage.view.shiftX = pose.x; stage.view.shiftY = pose.y; stage._applyView();
     stage._setSpherical({ theta: pose.theta + pose.spin, phi: pose.phi, radius: fitR(pose.r), ty: pose.ty });
     stage.root.rotation.y = pose.rotY + pose.sway * (Math.sin(t * 0.35) * 0.42 + mouse.sx * 0.55);
@@ -96,10 +100,23 @@ export function createSite({ stage, avatar, hair, STYLES, COLORS, mouse, onTry }
   });
 
   // ---------- transitions de pose entre sections ----------
+  // Chaque transition est un simple repère de défilement ; la pose est recalculée
+  // à chaque image en enchaînant les transitions dans l'ordre (aucun conflit possible).
+  const transitions = [];
   function poseTween(from, to, trigger, start = 'top bottom', end = 'top top') {
-    const f = {}, t = {};
-    KEYS.forEach((k) => { f[k] = () => poses()[from][k]; t[k] = () => poses()[to][k]; });
-    gsap.fromTo(pose, f, { ...t, ease: 'none', immediateRender: false, scrollTrigger: { trigger, start, end, scrub: 1.2, invalidateOnRefresh: true } });
+    transitions.push({ to, st: ScrollTrigger.create({ trigger, start, end }) });
+  }
+  const easeIO = (k) => k * k * (3 - 2 * k);
+  const target = {};
+  function targetPose() {
+    const P = poses();
+    Object.assign(target, P.hero);
+    for (const t of transitions) {
+      const k = easeIO(Math.min(1, Math.max(0, t.st.progress)));
+      if (k <= 0) break;
+      for (const key of KEYS) target[key] += (P[t.to][key] - target[key]) * k;
+    }
+    return target;
   }
   poseTween('hero', 'mani', '#manifeste', 'top bottom', 'top 15%');
   poseTween('mani', 'proc', '#processus');
@@ -113,7 +130,7 @@ export function createSite({ stage, avatar, hair, STYLES, COLORS, mouse, onTry }
     hero: () => startCycle(),
     mani: () => hair.show(byId('bun'), 'drop'),
     proc: () => applyProcess(procState.p, true),
-    coll: () => hair.show(STYLES[collState.idx], 'drop'),
+    coll: () => hair.show(FEAT[collState.idx], 'drop'),
     r360: () => hair.show(byId('cornrows'), 'drop'),
     colors: () => { hair.show(byId('box-braids'), 'drop'); applyColor(colorState.idx, true); },
     final: () => hair.show(byId('afro'), 'drop'),
@@ -149,6 +166,7 @@ export function createSite({ stage, avatar, hair, STYLES, COLORS, mouse, onTry }
   // parallaxe de sortie du héros : les deux lignes s'écartent
   gsap.to('.ht--1', { xPercent: -18, ease: 'none', scrollTrigger: { trigger: '#top', start: 'top top', end: 'bottom top', scrub: true } });
   gsap.to('.ht--2', { xPercent: 14, ease: 'none', scrollTrigger: { trigger: '#top', start: 'top top', end: 'bottom top', scrub: true } });
+  gsap.to('.ht--3', { xPercent: -10, ease: 'none', scrollTrigger: { trigger: '#top', start: 'top top', end: 'bottom top', scrub: true } });
   gsap.to('.hero-title', { opacity: 0, ease: 'none', scrollTrigger: { trigger: '#top', start: '30% top', end: '85% top', scrub: true } });
   gsap.to('.hero-meta, .hero-bottom', { y: -80, opacity: 0, ease: 'none', scrollTrigger: { trigger: '#top', start: '15% top', end: '70% top', scrub: true } });
 
@@ -228,7 +246,7 @@ export function createSite({ stage, avatar, hair, STYLES, COLORS, mouse, onTry }
 
   // ---------- collection : piste horizontale ----------
   const track = $('#collTrack');
-  track.innerHTML = STYLES.map((s, i) => `
+  track.innerHTML = FEAT.map((s, i) => `
     <button class="ccard" data-id="${s.id}" data-cursor="Essayer">
       <span class="ccard__img"><img alt="" /></span>
       <span class="ccard__n">${pad2(i + 1)}</span>
@@ -236,7 +254,7 @@ export function createSite({ stage, avatar, hair, STYLES, COLORS, mouse, onTry }
       <span class="ccard__name">${s.name}</span>
       <span class="ccard__meta">${s.duration} · ${s.price} FCFA</span>
     </button>`).join('');
-  $('#collTotal').textContent = pad2(STYLES.length);
+  $('#collTotal').textContent = pad2(FEAT.length);
   const cards = $$('.ccard', track);
   const collState = { idx: -1 };
   const collName = $('#collName');
@@ -247,18 +265,18 @@ export function createSite({ stage, avatar, hair, STYLES, COLORS, mouse, onTry }
     $('#collIdx').textContent = pad2(i + 1);
     const old = $$('.ch', collName);
     const write = () => {
-      collName.textContent = STYLES[i].name; delete collName.dataset.done;
+      collName.textContent = FEAT[i].name; delete collName.dataset.done;
       gsap.fromTo(splitChars(collName), { yPercent: 100, opacity: 0 }, { yPercent: 0, opacity: 1, duration: 0.9, ease: 'expo.out', stagger: 0.02 });
     };
     if (old.length) gsap.to(old, { yPercent: -100, opacity: 0, duration: 0.25, stagger: 0.008, onComplete: write }); else write();
-    if (active && current === 'coll') hair.show(STYLES[i], 'drop');
+    if (active && current === 'coll') hair.show(FEAT[i], 'drop');
   }
   ScrollTrigger.create({
     trigger: '#collection', start: 'top top', end: 'bottom bottom',
     onUpdate: (self) => {
       const p = self.progress;
       const step = cards[0].offsetWidth + 16;
-      const f = p * (STYLES.length - 1);
+      const f = p * (FEAT.length - 1);
       gsap.set(track, { x: -cards[0].offsetWidth / 2 - f * step });
       gsap.set('#collBar', { scaleX: p });
       setCollIdx(Math.round(f));
@@ -324,7 +342,7 @@ export function createSite({ stage, avatar, hair, STYLES, COLORS, mouse, onTry }
   });
   ScrollTrigger.create({
     trigger: '#salons', start: 'top 60px', end: 'bottom 60px',
-    onToggle: (self) => { document.body.classList.toggle('on-light', self.isActive); $('#rail').classList.toggle('is-dark', self.isActive); },
+    onToggle: () => {},
   });
   $$('[data-count]').forEach((el) => {
     const to = +el.dataset.count;
@@ -439,8 +457,7 @@ export function createSite({ stage, avatar, hair, STYLES, COLORS, mouse, onTry }
     intro() {
       window.scrollTo(0, 0);
       const P = poses().hero;
-      Object.assign(pose, P, { r: P.r * 1.6, theta: -0.9, spin: 0, rotY: 0 });
-      gsap.to(pose, { r: P.r, theta: 0, duration: 3, ease: 'expo.out' });
+      Object.assign(pose, P, { r: P.r * 1.7, theta: P.theta - 1.1, spin: 0, rotY: 0 });
       const tl = gsap.timeline({ defaults: { ease: 'expo.out' } });
       const chars = $$('.hero-title [data-split]').flatMap((el) => splitChars(el));
       tl.fromTo(chars, { yPercent: 120, rotate: 6 }, { yPercent: 0, rotate: 0, duration: 1.6, stagger: 0.035 }, 0.1)

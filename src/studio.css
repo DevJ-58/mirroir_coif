@@ -94,3 +94,101 @@ a.btn { text-decoration: none; cursor: none; }
   .details .details__actions .btn__arrow { display: none; }
   .favbtn { width: 44px; height: 44px; }
 }
+
+/* =====================================================================
+   Collection de la cabine — sans conteneur, présentée par pages
+   ===================================================================== */
+.panel { position: absolute; right: var(--pad); top: calc(var(--pad) * 0.8 + 78px + env(safe-area-inset-top, 0px)); bottom: calc(var(--pad) + 76px + env(safe-area-inset-bottom, 0px)); width: min(380px, 29vw); display: flex; flex-direction: column; }
+.panel__head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; padding-bottom: 18px; }
+.panel__k { margin: 0 0 10px; font-size: 10px; letter-spacing: 0.3em; text-transform: uppercase; color: var(--gold); }
+.panel__title { margin: 0; font-family: var(--serif); font-weight: 400; font-size: clamp(26px, 2.2vw, 36px); line-height: 0.95; letter-spacing: -0.02em; }
+.panel__count { font-family: var(--serif); font-size: 14px; color: var(--muted); padding-bottom: 4px; }
+.panel__count::before { content: '— '; color: var(--gold); }
+
+/* onglets de catégories : texte seul, trait doré sous l'actif */
+.chips { display: flex; gap: 20px; padding: 0 0 12px; margin-bottom: 6px; border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
+.chips::-webkit-scrollbar { display: none; }
+.chip { position: relative; flex: none; padding: 6px 0; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); white-space: nowrap; transition: color 0.4s; }
+.chip::after { content: ''; position: absolute; left: 0; right: 0; bottom: -13px; height: 1px; background: var(--gold); transform: scaleX(0); transform-origin: left; transition: transform 0.6s var(--ease); }
+.chip:hover { color: var(--ivory-2); }
+.chip.is-active { color: var(--ivory); }
+.chip.is-active::after { transform: scaleX(1); }
+
+/* liste des styles : vignette flottante + nom, aucun cadre */
+.cards { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: center; gap: 4px; overflow: hidden; }
+.card { display: none; position: relative; grid-template-columns: 1fr var(--th, 104px); grid-template-areas: "no img" "body img"; align-items: center; column-gap: 16px; padding: 2px 0; text-align: right; background: none; border: 0; }
+.card.is-shown { display: grid; }
+.card__no { grid-area: no; align-self: end; font-family: var(--sans); font-size: 10px; letter-spacing: 0.24em; color: var(--muted); transition: color 0.4s; }
+.card__body { grid-area: body; align-self: start; }
+.card__img { grid-area: img; position: relative; display: block; aspect-ratio: 1; }
+.card__img::before { content: ''; position: absolute; inset: 8%; border-radius: 50%; background: radial-gradient(circle, rgba(233, 207, 159, 0.22), transparent 68%); opacity: 0; transform: scale(0.7); transition: opacity 0.6s, transform 0.9s var(--ease); }
+.card__img img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; opacity: 0; transform: scale(1.12); transition: transform 0.9s var(--ease), opacity 0.6s; -webkit-mask-image: radial-gradient(closest-side, #000 72%, transparent 100%); mask-image: radial-gradient(closest-side, #000 72%, transparent 100%); }
+.card__img img.ready { opacity: 1; }
+.card__img .sk { position: absolute; inset: 24%; border-radius: 50%; background: linear-gradient(110deg, rgba(255, 255, 255, 0.03) 30%, rgba(255, 255, 255, 0.08) 50%, rgba(255, 255, 255, 0.03) 70%); background-size: 200% 100%; animation: sk 1.4s linear infinite; }
+@keyframes sk { to { background-position: -200% 0; } }
+.card__name { display: block; font-family: var(--serif); font-size: clamp(22px, 1.9vw, 30px); line-height: 1; letter-spacing: -0.02em; color: var(--ivory-2); transition: color 0.5s, transform 0.7s var(--ease); }
+.card__meta { display: block; margin-top: 6px; font-size: 11px; color: var(--muted); letter-spacing: 0.04em; }
+.card:hover .card__name { color: var(--ivory); transform: translateX(-6px); }
+.card:hover .card__img img { transform: scale(1.2); }
+.card:hover .card__img::before, .card.is-selected .card__img::before { opacity: 1; transform: none; }
+.card.is-selected .card__name { color: var(--gold); font-style: italic; }
+.card.is-selected .card__no { color: var(--gold); }
+.card.is-selected::after { display: none; }
+.card.is-selected .card__no::before { content: ''; display: inline-block; width: 22px; height: 1px; margin-right: 10px; vertical-align: middle; background: var(--gold); }
+.card__fav { right: auto; left: 4px; top: 4px; }
+
+/* pagination */
+.pager { display: flex; align-items: center; justify-content: flex-end; gap: 14px; padding: 12px 0 14px; }
+.pager__btn { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; border: 1px solid var(--line); color: var(--ivory-2); transition: border-color 0.4s, color 0.4s, transform 0.5s var(--ease); }
+.pager__btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.pager__btn:hover { border-color: var(--gold); color: var(--gold); transform: scale(1.06); }
+.pager__btn:disabled { opacity: 0.3; pointer-events: none; }
+.pager__idx { display: flex; align-items: center; gap: 10px; font-family: var(--serif); font-size: 15px; color: var(--muted); order: -1; margin-right: auto; }
+.pager__idx b { font-weight: 400; color: var(--gold); font-size: 22px; }
+.pager__idx i { width: 30px; height: 1px; background: var(--line); }
+.pager.is-single { visibility: hidden; }
+
+.panel__foot { padding-top: 14px; border-top: 1px solid var(--line); }
+.swatches { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+.panel__foot .panel__k { text-align: right; }
+.sw { width: 26px; height: 26px; border-radius: 50%; position: relative; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.15); transition: transform 0.5s var(--ease); }
+.sw::after { content: ''; position: absolute; inset: -5px; border-radius: 50%; border: 1px solid var(--gold); opacity: 0; transform: scale(0.7); transition: opacity 0.4s, transform 0.5s var(--ease); }
+.sw:hover { transform: scale(1.12); }
+.sw.is-active::after { opacity: 1; transform: scale(1); }
+
+/* cabine en mise en page empilée : rangée flottante, le mannequin reste au centre */
+@media (orientation: portrait), (max-width: 980px) {
+  .panel { left: var(--pad); right: var(--pad); top: auto; bottom: calc(var(--pad) + 62px + env(safe-area-inset-bottom, 0px)); width: auto; height: auto; }
+  .panel::before { content: ''; position: absolute; z-index: -1; left: calc(var(--pad) * -1); right: calc(var(--pad) * -1); top: -60px; bottom: -120px; pointer-events: none; background: linear-gradient(0deg, rgba(10, 8, 7, 0.92) 30%, rgba(10, 8, 7, 0.55) 70%, transparent); }
+  .panel__head, .panel__foot { display: none; }
+  .chips { justify-content: flex-start; gap: 18px; padding-bottom: 10px; margin-bottom: 10px; }
+  .chip::after { bottom: -11px; }
+  .cards { flex-direction: row; justify-content: space-around; align-items: flex-start; gap: 6px; min-height: 0; }
+  .card { grid-template-columns: 1fr; grid-template-areas: "img" "body"; justify-items: center; text-align: center; row-gap: 4px; width: calc((100% - 18px) / var(--per, 3)); }
+  .card__img { width: min(100%, 92px); }
+  .card__no, .card__meta { display: none; }
+  .card__name { font-size: clamp(14px, 3.8vw, 19px); line-height: 1.1; }
+  .card:hover .card__name { transform: none; }
+  .pager { position: absolute; left: 0; right: 0; top: 40px; padding: 0; justify-content: space-between; pointer-events: none; }
+  .pager__btn { pointer-events: auto; width: 30px; height: 30px; background: rgba(10, 8, 7, 0.6); backdrop-filter: blur(6px); }
+  .pager__idx { display: none; }
+  .card__fav { left: 50%; margin-left: 22px; }
+}
+@media (orientation: portrait) and (min-width: 560px) { .card { --per: 4; } }
+
+/* écrans bas : en-tête de collection allégé pour laisser la place aux styles */
+@media (max-height: 760px) and (orientation: landscape) {
+  .panel__title { display: none; }
+  .panel__head { padding-bottom: 10px; }
+  .panel__head .panel__k { margin: 0; }
+  .panel__foot .panel__k { display: none; }
+  .panel__foot { padding-top: 10px; }
+  .pager { padding: 8px 0 10px; }
+  .card__meta { display: none; }
+}
+
+/* téléphone : cœurs discrets (le cœur de la fiche reste disponible), flèches centrées sur les vignettes */
+@media (orientation: portrait), (max-width: 980px) {
+  .card__fav:not(.is-on) { opacity: 0 !important; pointer-events: none; }
+  .pager { top: calc(40px + min(46px, 12vw)); transform: translateY(-50%); }
+}
