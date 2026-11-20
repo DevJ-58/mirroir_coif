@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 
 // Adresses du site : chaque page reçoit une copie de index.html, pour qu'un hébergement
 // statique serve aussi les liens directs (/collection, /journal/…). 404.html sert le reste.
-const ROUTES = ['collection', 'heritage', 'technologie', 'salons', 'partenaires', 'journal', 'a-propos', 'faq', 'contact'];
+const ROUTES = ['collection', 'heritage', 'technologie', 'salons', 'partenaires', 'journal', 'a-propos', 'faq', 'contact', 'artiste'];
 
 export default defineConfig({
   plugins: [{

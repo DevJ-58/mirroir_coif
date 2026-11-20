@@ -6,8 +6,9 @@ import salons from './salons.js';
 import partenaires from './partenaires.js';
 import { journal, article } from './journal.js';
 import { apropos, faq, contact } from './infos.js';
+import artiste from './artiste.js';
 import notfound from './notfound.js';
 
-export const PAGES = [lookbook, heritage, technologie, salons, partenaires, journal, article, apropos, faq, contact, notfound];
+export const PAGES = [lookbook, heritage, technologie, salons, partenaires, journal, article, apropos, faq, contact, artiste, notfound];
 
 export { MENU } from './menu.js';

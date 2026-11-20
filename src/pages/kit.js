@@ -47,7 +47,7 @@ export function pageFoot(next) {
     </a>` : ''}
     <div class="pg-foot__cols">
       <div><span class="k">Découvrir</span><a href="/collection" data-link>Lookbook</a><a href="/heritage" data-link>Héritage</a><a href="/technologie" data-link>Technologie</a><a href="/journal" data-link>Journal</a></div>
-      <div><span class="k">Salons</span><a href="/salons" data-link>Offre salons</a><a href="/partenaires" data-link>Salons partenaires</a><a href="/faq" data-link>Questions fréquentes</a></div>
+      <div><span class="k">Salons</span><a href="/salons" data-link>Offre salons</a><a href="/partenaires" data-link>Salons partenaires</a><a href="/faq" data-link>Questions fréquentes</a><a href="/artiste" data-link>Atelier artiste</a></div>
       <div><span class="k">GARO</span><a href="/a-propos" data-link>Allons se garo</a><a href="/contact" data-link>Contact</a><a href="/" data-link>Accueil</a></div>
       <div><span class="k">©</span><span>2026 GARO · Abidjan</span><button class="pg-top" data-top>Haut de page ↑</button></div>
     </div>

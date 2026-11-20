@@ -45,7 +45,7 @@ const mouse = { x: 0, y: 0, sx: 0, sy: 0 };
 window.addEventListener('pointermove', (e) => { mouse.x = e.clientX / window.innerWidth - 0.5; mouse.y = e.clientY / window.innerHeight - 0.5; });
 const site = createSite({ stage, avatar, hair, STYLES, COLORS, mouse, onTry: (id) => tryStyle(id) });
 window.__garoLenis = site.lenis;
-const router = createRouter({ site, pages: PAGES, ctx: { hair, STYLES, CATEGORIES, COLORS, stage, avatar, onTry: (id) => tryStyle(id), beforeRoute: () => site.closeMenu(), thumbs: null } });
+const router = createRouter({ site, pages: PAGES, ctx: { hair, STYLES, CATEGORIES, COLORS, stage, avatar, onTry: (id) => tryStyle(id), beforeRoute: () => site.closeMenu(), thumbs: null, publish: (f) => deposit.publish(f), toast: (t) => toast(t) } });
 stage.onTick((dt, t) => {
   mouse.sx += (mouse.x - mouse.sx) * 0.05; mouse.sy += (mouse.y - mouse.sy) * 0.05;
   if (state.idle) {

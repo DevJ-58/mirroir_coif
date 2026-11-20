@@ -111,6 +111,17 @@ export function initDeposit({ STYLES, CATEGORIES, hair, state, select, refreshCo
       }
       return n;
     },
+    /** Publication depuis l'atelier artiste : { name, cat, duration, price, desc, data: ArrayBuffer }. Renvoie le style. */
+    async publish(fields) {
+      const id = 'glb-' + Date.now().toString(36);
+      await registerGlb(id, fields.data);
+      const rec = { id, name: fields.name, cat: fields.cat, duration: fields.duration || '', price: fields.price || '', desc: fields.desc || '', data: fields.data, added: Date.now(), source: 'atelier' };
+      await saveStyle(rec);
+      const style = toStyle(rec);
+      STYLES.push(style);
+      await refreshCollection();
+      return style;
+    },
     /** Le bouton « retirer » n'apparaît que pour une coiffure déposée. */
     onSelect(style) { const b = $('.details__remove'); if (b) b.hidden = !style?.custom; },
   };
