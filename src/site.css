@@ -349,7 +349,9 @@ body.menu-open .burger i:last-child { transform: translateY(-4px) rotate(-45deg)
   /* processus : étapes en bas sur un fondu */
   .process-head { padding-right: 0; }
   .process-steps { justify-self: stretch; align-self: end; width: auto; height: auto; min-height: 42vh; margin: 0 calc(var(--pad) * -1); }
-  .pstep { justify-content: flex-end; padding: 0 var(--pad) 22px; background: linear-gradient(0deg, rgba(11, 9, 8, 0.92) 45%, transparent); }
+  /* le fondu est porté par le conteneur : posé sur chaque étape, il masquait les étapes empilées dessous */
+  .process-steps { background: linear-gradient(0deg, rgba(11, 9, 8, 0.92) 45%, transparent); }
+  .pstep { justify-content: flex-end; padding: 0 var(--pad) 22px; background: none; }
   .pstep__t { font-size: clamp(54px, 15vw, 130px); }
   .pstep__d { margin-top: 14px; }
 

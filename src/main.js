@@ -68,7 +68,11 @@ function show(name) {
   const prev = state.screen;
   state.screen = name;
   document.body.dataset.screen = name;
-  $$('.screen').forEach((s) => s.classList.toggle('is-on', s.id === name));
+  $$('.screen').forEach((s) => {
+    s.classList.toggle('is-on', s.id === name);
+    // un écran quitté ne garde aucune visibilité forcée par une animation (ex. présentation)
+    if (s.id !== name) { gsap.killTweensOf(s); s.style.visibility = ''; s.style.opacity = ''; }
+  });
   document.body.classList.toggle('app-mode', name !== 'site' && name !== 'loader');
   $('#stepLabel').textContent = STEP_LABEL[name] || '';
   return prev;
@@ -551,7 +555,8 @@ function stopPresent() {
   stage.lights.key.position.set(-55, 62, 56); stage.lights.rim.intensity = 2.2;
   gsap.to('.present__bar', { scaleY: 0, duration: 0.9, ease: 'expo.inOut' });
   gsap.to('.present__caption > *', { opacity: 0, duration: 0.4, onComplete: () => $('#present').classList.remove('is-on') });
-  gsap.to('#studio', { autoAlpha: 1, duration: 0.8, delay: 0.3 });
+  gsap.set('#studio', { clearProps: 'visibility' });
+  gsap.to('#studio', { opacity: 1, duration: 0.8, delay: 0.3, clearProps: 'opacity' });
   const L = applyLayout('studio');
   const sph = stage._spherical();
   const theta = Math.atan2(Math.sin(sph.theta), Math.cos(sph.theta));
