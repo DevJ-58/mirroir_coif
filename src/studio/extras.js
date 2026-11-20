@@ -98,7 +98,7 @@ export function initExtras({ stage, hair, state, STYLES, select, toast, onReset 
 
   // modale côte à côte : chaque favori rendu sur l'avatar de la personne
   const favCam = new THREE.PerspectiveCamera(28, 1, 1, 1000);
-  favCam.position.set(26, 6, 84); favCam.lookAt(0, 0.8, 0);
+  favCam.position.set(30, 11, 98); favCam.lookAt(0, 2.5, 0);
   function renderOn(style) {
     const h = hair.get(style);
     const saved = [...hair.cache.values()].map((x) => [x, x.group.visible, x.common.uGrow.value, x.group.position.y, x.group.scale.x]);

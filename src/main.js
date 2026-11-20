@@ -79,11 +79,14 @@ function layoutFor(name) {
   if (name === 'intro') return p ? { x: 0, y: -0.11, r: fit(132) } : { x: 0.16, y: 0, r: 112 };
   if (name === 'scan') return p ? { x: 0, y: 0, r: fit(150) } : { x: -0.2, y: 0, r: 150 };
   if (name === 'generate') return { x: 0, y: 0, r: fit(98) };
-  if (name === 'studio') return p ? { x: 0, y: -0.06, r: fit(128) } : { x: -0.035, y: 0, r: 116 };
+  if (name === 'studio') return p ? { x: 0, y: -0.1, r: fit(142) * 1.1 } : { x: -0.035, y: 0, r: 116 };
   return { x: 0, y: 0, r: 110 };
 }
 function applyLayout(name, d = 1.6) {
   const L = layoutFor(name);
+  // la distance de la caméra en portrait dépasse la limite du zoom : on l'élargit
+  stage.controls.maxDistance = Math.max(150, L.r * 1.25);
+  stage.controls.minDistance = Math.min(48, L.r * 0.5);
   stage.shift(L.x, L.y, d);
   document.documentElement.style.setProperty('--ring-x', `${L.x * window.innerWidth}px`);
   return L;
@@ -383,8 +386,9 @@ function resetSession() {
 // Vignettes rendues hors écran, une par image, sans perturber la scène affichée.
 async function renderThumbs() {
   const cam = new THREE.PerspectiveCamera(30, 1, 1, 1000);
-  cam.position.set(30, 9, 82);
-  cam.lookAt(0, 0.5, 0);
+  // cadrage large : le haut des coiffures volumineuses (afro, chignon) reste dans l'image
+  cam.position.set(34, 13, 96);
+  cam.lookAt(0, 3, 0);
   const thumbs = {};
   for (const s of STYLES) {
     const h = hair.get(s);
@@ -572,7 +576,7 @@ function composeShot(url, s) {
   g.fillText(s.name, 48 * k, c.height - 84 * k);
   g.fillStyle = '#e9cf9f';
   g.font = `${Math.round(16 * k)}px "Inter Tight", sans-serif`;
-  g.fillText(`MIROIR · ${s.duration} · ${s.price} FCFA · ${state.color.name}`.toUpperCase(), 50 * k, c.height - 46 * k);
+  g.fillText(`GARO · ${s.duration} · ${s.price} FCFA · ${state.color.name}`.toUpperCase(), 50 * k, c.height - 46 * k);
   void url;
   return c.toDataURL('image/png');
 }
@@ -582,7 +586,7 @@ function book() {
   const shot = composeShot(raw, s);
   $('#modalShot').src = raw;
   $('#saveShot').href = shot;
-  $('#saveShot').download = `miroir-${s.id}.png`;
+  $('#saveShot').download = `garo-${s.id}.png`;
   $('#modalTitle').textContent = s.name;
   $('#modalMeta').textContent = `${s.duration} · ${s.price} FCFA · ${state.color.name}`;
   const m = $('#modal');
