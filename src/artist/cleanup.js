@@ -137,47 +137,73 @@ function align(pos, score, thr) {
 }
 
 /**
- * Ajustement fin : la taille et la position où l'intérieur de la coiffure épouse le crâne
- * du mannequin (au plus près, sans le traverser).
+ * Ajustement : la taille et la position où l'intérieur de la coiffure épouse le crâne du mannequin
+ * (au plus près, sans le traverser). Recherche large puis fine : le calage approximatif (cou, nez)
+ * ne fournit que l'orientation et un point de départ, l'échelle finale vient du crâne.
  */
+const FIT_C = [0, 6, -4.9];   // point du mannequin où l'on pose le centre de la coiffure au départ
 function refine(pos, score, al) {
   const ids = [];
   for (let i = 0; i < pos.count; i++) if (score[i] >= 0.5) ids.push(i);
-  if (ids.length < 50) return { k: 1, dy: 0, dz: 0 };
+  if (ids.length < 50) return { k: 1, d: [0, 0, 0], c0: [0, 0, 0] };
   const step = Math.max(1, Math.floor(ids.length / 1500));
   const c = Math.cos(al.yaw), sn = Math.sin(al.yaw);
-  // positions dans le repère du mannequin, avant ajustement, relatives au cou
+  // positions après le calage approximatif
   const P = [];
+  const c0 = [0, 0, 0];
   for (let j = 0; j < ids.length; j += step) {
     const i = ids[j];
     const x = (pos.getX(i) - al.pivot[0]) * al.scale, y = (pos.getY(i) - al.pivot[1]) * al.scale, z = (pos.getZ(i) - al.pivot[2]) * al.scale;
-    P.push([x * c + z * sn, y, -x * sn + z * c]);
+    const p = [al.target[0] + x * c + z * sn, al.target[1] + y, al.target[2] - x * sn + z * c];
+    P.push(p); c0[0] += p[0]; c0[1] += p[1]; c0[2] += p[2];
   }
+  c0[0] /= P.length; c0[1] /= P.length; c0[2] /= P.length;
+  // la coiffure, centrée sur son centre de masse
+  const Q = P.map((p) => [p[0] - c0[0], p[1] - c0[1], p[2] - c0[2]]);
   const pr = { rx: 0, c: 0, rz: 0 };
   const dist = (x, y, z) => {
-    if (y > HEAD_TOP) return y - HEAD_TOP;
-    if (y < -9) return 99;   // sous la mâchoire : non pris en compte
+    if (y > HEAD_TOP) return y - HEAD_TOP + Math.max(0, Math.hypot(x, z + 4.6) - 3) * 0.3;
+    if (y < -9) return 99;   // sous la mâchoire : non pris en compte (tresses longues)
     headProfile(y, pr);
     const u = Math.hypot(x / pr.rx, (z - pr.c) / pr.rz);
     return (u - 1) * (pr.rx + pr.rz) * 0.5;
   };
-  let best = { k: 1, dy: 0, dz: 0 }, bestScore = Infinity;
-  const ds = new Float32Array(P.length);
-  for (let k = 0.7; k <= 1.2001; k += 0.05) for (let dy = -6; dy <= 6.001; dy += 1) for (let dz = -6; dz <= 6.001; dz += 1.5) {
+  // étendue de la coiffure (5 % – 95 %), pour exiger qu'elle entoure le crâne
+  const pct = (arr, p) => arr[Math.min(arr.length - 1, Math.floor(arr.length * p))];
+  const xs = Q.map((q) => q[0]).sort((m, n) => m - n), zs = Q.map((q) => q[2]).sort((m, n) => m - n), ys = Q.map((q) => q[1]).sort((m, n) => m - n);
+  const W0 = pct(xs, 0.95) - pct(xs, 0.05), D0 = pct(zs, 0.95) - pct(zs, 0.05), Ytop = pct(ys, 0.98);
+  const ds = new Float32Array(Q.length);
+  const fitScore = (k, dy, dz) => {
+    // couverture : au moins la largeur (≈ 16 cm) et la profondeur (≈ 19 cm) du crâne, et son sommet
+    const cover = Math.max(0, 14.5 - k * W0) / 1.5 + Math.max(0, 16.5 - k * D0) / 1.5 + Math.max(0, HEAD_TOP - (FIT_C[1] + Ytop * k + dy)) / 2;
     let inside = 0, n = 0;
-    for (const p of P) {
-      const d = dist(p[0] * k, al.target[1] + p[1] * k + dy, al.target[2] + p[2] * k + dz);
+    for (const q of Q) {
+      const d = dist(FIT_C[0] + q[0] * k, FIT_C[1] + q[1] * k + dy, FIT_C[2] + q[2] * k + dz);
       if (d === 99) continue;
       if (d < -0.3) inside++;
       ds[n++] = d;
     }
-    if (n < 20) continue;
-    const arr = Array.from(ds.subarray(0, n)).sort((a, b) => a - b);
-    const q = arr[Math.floor(n * 0.2)];
-    const sc = (inside / n) * 12 + Math.abs(q - 0.6) / 4;
-    if (sc < bestScore) { bestScore = sc; best = { k, dy, dz }; }
+    if (n < Q.length * 0.25 || n < 20) return Infinity;
+    const arr = ds.slice(0, n).sort();
+    const q20 = arr[Math.floor(n * 0.2)], q60 = arr[Math.floor(n * 0.6)];
+    // ni à travers le crâne, ni flottante : la face interne colle (≈ 0,6 cm), le volume reste près
+    return (inside / n) * 14 + Math.abs(q20 - 0.6) / 3 + Math.max(0, q60 - 9) / 6 + cover;
+  };
+  // recherche large (taille de ×0,35 à ×2,8), puis fine autour du meilleur
+  let best = { k: 1, dy: 0, dz: 0 }, bs = Infinity;
+  for (let e = -1.6; e <= 1.03; e += 0.09) {
+    const k = Math.exp(e);
+    for (let dy = -14; dy <= 10; dy += 2) for (let dz = -8; dz <= 8; dz += 2) {
+      const v = fitScore(k, dy, dz);
+      if (v < bs) { bs = v; best = { k, dy, dz }; }
+    }
   }
-  return best;
+  const b0 = { ...best };
+  for (let k = b0.k * 0.9; k <= b0.k * 1.1001; k += b0.k * 0.025) for (let dy = b0.dy - 2; dy <= b0.dy + 2.001; dy += 0.5) for (let dz = b0.dz - 2; dz <= b0.dz + 2.001; dz += 0.5) {
+    const v = fitScore(k, dy, dz);
+    if (v < bs) { bs = v; best = { k, dy, dz }; }
+  }
+  return { k: best.k, d: [FIT_C[0], FIT_C[1] + best.dy, FIT_C[2] + best.dz], c0, score: bs };
 }
 
 /**
@@ -211,6 +237,8 @@ export function buildHair(A, opts = {}) {
     high.set(r, Math.max(high.get(r) ?? -Infinity, y));
   }
   const biggest = Math.max(0, ...size.values());
+  const total = keep.length / 3;
+  const parts = [...size.values()].filter((v) => v > total * 0.15).length;
   const ok = (r) => size.get(r) >= biggest * 0.05 || high.get(r) > neckY;
   const kept = [];
   for (let t = 0; t < keep.length; t += 3) if (ok(find(keep[t]))) kept.push(keep[t], keep[t + 1], keep[t + 2]);
@@ -231,12 +259,21 @@ export function buildHair(A, opts = {}) {
   const outer = new THREE.Group();
   outer.add(inner);
   inner.rotation.y = al.yaw + (opts.yaw || 0);
-  const fine = al.fine || { k: 1, dy: 0, dz: 0 };
-  inner.scale.setScalar(al.scale * fine.k * (opts.scale || 1));
-  outer.position.set(al.target[0], al.target[1] + fine.dy + (opts.dy || 0), al.target[2] + fine.dz + (opts.dz || 0));
-  outer.rotation.x = opts.tilt || 0;
-  outer.updateMatrixWorld(true);
-  return { group: outer, triangles: keep.length / 3 };
+  inner.scale.setScalar(al.scale);
+  outer.position.set(al.target[0], al.target[1], al.target[2]);
+  // ajustement au crâne (taille, position) puis réglages manuels, autour du centre de la coiffure
+  const fine = al.fine || { k: 1, d: [0, 0, 0], c0: [0, 0, 0] };
+  const k = fine.k * (opts.scale || 1);
+  const center = new THREE.Group();          // centre de la coiffure à l'origine
+  center.position.set(-fine.c0[0], -fine.c0[1], -fine.c0[2]);
+  center.add(outer);
+  const fit = new THREE.Group();
+  fit.add(center);
+  fit.scale.setScalar(k);
+  fit.rotation.x = opts.tilt || 0;
+  fit.position.set(fine.d[0], fine.d[1] + (opts.dy || 0), fine.d[2] + (opts.dz || 0));
+  fit.updateMatrixWorld(true);
+  return { group: fit, triangles: keep.length / 3, parts, fit: fine.score };
 }
 
 /** Exporte la coiffure calée en .glb (centimètres, repère du mannequin). */

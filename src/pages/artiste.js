@@ -226,7 +226,9 @@ export default {
       hairObj = r.group;
       avatar.group.add(hairObj);
       if (raw) raw.visible = false;
-      $('#atAuto', root).textContent = `${r.triangles.toLocaleString('fr-FR')} triangles gardés · calage automatique par ${A.auto.method === 'cou' ? 'le cou et la naissance des cheveux' : 'la taille de la coiffure'}. Ajustez si besoin.`;
+      const warn = r.parts >= 2 ? ' Attention : plusieurs têtes détectées. Sélectionnez une seule vue par image (étape 1), puis relancez.' : (r.fit > 0.55 ? ' Calage incertain : si l’image contient plusieurs vues, sélectionnez-en une seule (étape 1) ; sinon, ajustez taille et position.' : '');
+      $('#atAuto', root).textContent = `${r.triangles.toLocaleString('fr-FR')} triangles gardés, coiffure ajustée au crâne du mannequin.${warn || ' Ajustez si besoin.'}`;
+      $('#atAuto', root).classList.toggle('is-warn', Boolean(warn));
       labels();
     }
     const schedule = () => { cancelAnimationFrame(rebuildT); rebuildT = requestAnimationFrame(rebuild); };

@@ -491,3 +491,4 @@ body.on-light .burger { color: var(--ink-d); }
   .at { padding-right: var(--pad); padding-top: 46vh; }
   .at-step { padding: 20px 18px 22px; }
 }
+.at-step__hint.is-warn { color: #e8907a; }
