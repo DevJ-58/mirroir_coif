@@ -394,8 +394,9 @@ export function createSite({ stage, avatar, hair, STYLES, COLORS, mouse, onTry }
     gsap.fromTo('#gl', { opacity: 1 }, { opacity: 0.2, ease: 'none', immediateRender: false, scrollTrigger: { trigger: '#manifeste', start: 'top 70%', end: 'top 20%', scrub: true } });
     gsap.fromTo('#gl', { opacity: 0.2 }, { opacity: 1, ease: 'none', immediateRender: false, scrollTrigger: { trigger: '#processus', start: 'top 95%', end: 'top 45%', scrub: true } });
   });
-  const footChars = splitChars($('.footer__brand [data-split]'));
-  gsap.fromTo(footChars, { yPercent: 100 }, { yPercent: 0, duration: 1.2, ease: 'expo.out', stagger: 0.05, scrollTrigger: { trigger: '.footer', start: 'top 95%', toggleActions: 'play none none reverse' } });
+  // le logo du pied de page se dessine trait par trait
+  const footStrokes = prepDraw($('.footer__logo'));
+  gsap.to(footStrokes, { strokeDashoffset: 0, duration: 1.8, ease: 'power3.inOut', stagger: 0.06, scrollTrigger: { trigger: '.footer', start: 'top 92%', toggleActions: 'play none none reverse' } });
 
   // ---------- rail, navigation, en-tête ----------
   const sections = $$('.site .s[data-label]');
@@ -513,11 +514,24 @@ export async function curtain(fn) {
   await gsap.timeline()
     .to(gold, { yPercent: 0, duration: 0.7, ease: 'expo.inOut' })
     .to(ink, { yPercent: 0, duration: 0.7, ease: 'expo.inOut' }, 0.12)
-    .fromTo(word, { opacity: 0, letterSpacing: '0.6em' }, { opacity: 1, letterSpacing: '0.3em', duration: 0.6, ease: 'expo.out' }, 0.55);
+    .set(word, { opacity: 1 }, 0.5)
+    .fromTo(prepDraw($('.curtain__logo')), { strokeDashoffset: (i, el) => el._len }, { strokeDashoffset: 0, duration: 0.7, ease: 'power2.inOut', stagger: 0.03 }, 0.5);
   await fn();
   await new Promise((r) => setTimeout(r, 150));
   await gsap.timeline()
     .to(word, { opacity: 0, duration: 0.3 })
     .to(ink, { yPercent: -100, duration: 0.8, ease: 'expo.inOut' }, 0.1)
     .to(gold, { yPercent: -100, duration: 0.8, ease: 'expo.inOut' }, 0.22);
+}
+
+/** Prépare les traits d'un logo SVG pour un effet de dessin (dasharray = longueur du trait). */
+export function prepDraw(svg) {
+  const strokes = [...svg.querySelectorAll('.lg-s')];
+  strokes.forEach((p) => {
+    const len = Math.ceil(p.getTotalLength()) + 2;
+    p._len = len;
+    p.style.strokeDasharray = String(len);
+    p.style.strokeDashoffset = String(len);
+  });
+  return strokes;
 }

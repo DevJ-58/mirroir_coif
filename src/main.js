@@ -7,7 +7,7 @@ import { alignLandmarks } from './three/head.js';
 import { STYLES, CATEGORIES, COLORS } from './data/catalog.js';
 import { runVideoScan, scanImage, sampleSkin, loadLandmarker } from './scan/scanner.js';
 import { initCursor, initMagnetic, setCursor } from './ui/cursor.js';
-import { createSite, curtain } from './site/site.js';
+import { createSite, curtain, prepDraw } from './site/site.js';
 import { initExtras } from './studio/extras.js';
 import { initPanel } from './studio/panel.js';
 
@@ -106,8 +106,10 @@ window.addEventListener('resize', () => {
 // les autres se construisent ensuite en arrière-plan, une par une.
 const FIRST = ['box-braids', 'afro'];
 async function boot() {
-  const letters = $$('.loader__brand span');
-  gsap.to(letters, { y: 0, duration: 1.2, ease: 'expo.out', stagger: 0.06 });
+  // le logo se dessine trait par trait pendant le chargement
+  const strokes = prepDraw($('.loader__logo'));
+  gsap.to(strokes, { strokeDashoffset: 0, duration: 1.6, ease: 'power3.inOut', stagger: 0.07 });
+  gsap.to('.loader__tag', { opacity: 1, duration: 1, delay: 1.2 });
   const bar = $('#loadBar'), pct = $('#loadPct'), txt = $('#loadText');
   const setP = (p, label) => { gsap.to(bar, { scaleX: p, duration: 0.5, ease: 'power2.out' }); pct.textContent = `${Math.round(p * 100)}%`; if (label) txt.textContent = label; };
   const q = new URLSearchParams(location.search);
@@ -127,7 +129,7 @@ async function boot() {
   setP(1, 'Studio prêt');
   await wait(380);
 
-  gsap.to(letters, { y: '-105%', duration: 0.8, ease: 'expo.in', stagger: 0.04 });
+  gsap.to('.loader__brand, .loader__tag', { y: -30, opacity: 0, duration: 0.8, ease: 'expo.in', stagger: 0.05 });
   gsap.to('#loader', { autoAlpha: 0, duration: 0.9, delay: 0.6, ease: 'power2.inOut', onComplete: () => $('#loader').remove() });
   await wait(700);
   document.body.classList.remove('is-loading');

@@ -46,7 +46,7 @@ body.app-mode .topnav, body.app-mode .topbar__cta, body.app-mode .burger { displ
 .topbar.is-solid::before { opacity: 1; }
 .brand, .topnav a, .topbar__cta, .burger i { transition: color 0.5s, background 0.5s, border-color 0.5s, transform 0.6s var(--ease); }
 body.on-light .brand { color: var(--ink-d); }
-body.on-light .brand__mark { border-color: rgba(23, 18, 15, 0.5); }
+
 body.on-light .topnav a { color: rgba(23, 18, 15, 0.7); }
 body.on-light .topbar__cta { background: var(--ink-d); color: var(--cream); }
 body.on-light .burger i { background: var(--ink-d); }
@@ -78,7 +78,8 @@ body.menu-open .burger i:last-child { transform: translateY(-4px) rotate(-45deg)
 .curtain i { position: absolute; inset: 0; transform: translateY(100%); }
 .curtain__gold { background: var(--gold); }
 .curtain__ink { background: #0a0807; display: grid; place-items: center; }
-.curtain__ink span { font-family: var(--serif); font-size: clamp(40px, 8vw, 120px); letter-spacing: 0.3em; padding-left: 0.3em; color: var(--ivory); opacity: 0; }
+.curtain__ink span { width: min(320px, 52vw); color: var(--ivory); opacity: 0; }
+.curtain__logo { display: block; width: 100%; height: auto; overflow: visible; }
 
 /* rail de progression */
 .rail { position: fixed; z-index: 30; right: calc(var(--pad) * 0.7); top: 50%; transform: translateY(-50%); display: grid; gap: 14px; }
@@ -284,7 +285,8 @@ body.menu-open .burger i:last-child { transform: translateY(-4px) rotate(-45deg)
 .final-title .cw { padding: 0 0.05em 0.16em; }
 .final-cta { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; margin-top: 46px; }
 .footer { width: 100%; padding: 36px 0 calc(var(--pad) + env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--line); display: flex; justify-content: space-between; align-items: flex-end; gap: 40px; flex-wrap: wrap; }
-.footer__brand { font-family: var(--serif); font-size: clamp(64px, 13vw, 260px); line-height: 0.78; letter-spacing: 0.02em; }
+.footer__brand { width: min(640px, 52vw); color: var(--ivory); }
+.footer__logo { display: block; width: 100%; height: auto; overflow: visible; }
 .footer__cols { display: flex; gap: clamp(30px, 4vw, 70px); flex-wrap: wrap; padding-bottom: 6px; }
 .footer__cols div { display: grid; gap: 8px; font-size: 13px; color: var(--ivory-2); align-content: start; }
 .footer__cols a { color: var(--ivory-2); text-decoration: none; cursor: none; transition: color 0.3s; }
@@ -395,7 +397,7 @@ body.menu-open .burger i:last-child { transform: translateY(-4px) rotate(-45deg)
   .final-cta .btn { justify-content: space-between; }
   .final-cta .btn--ghost { justify-content: center; }
   .footer { flex-direction: column; align-items: flex-start; gap: 28px; }
-  .footer__brand { font-size: 22vw; }
+  .footer__brand { width: 78vw; }
 }
 
 /* téléphone */

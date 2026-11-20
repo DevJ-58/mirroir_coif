@@ -8,6 +8,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400..700;1,6..96,400..700&family=Inter+Tight:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <link rel="icon" type="image/svg+xml" href="/brand/garo-icone.svg" />
+  <link rel="apple-touch-icon" href="/brand/apple-touch-icon.png" />
+  <meta name="theme-color" content="#0B0908" />
   <link rel="stylesheet" href="/src/style.css" />
   <link rel="stylesheet" href="/src/site.css" />
   <link rel="stylesheet" href="/src/studio.css" />
@@ -33,8 +36,7 @@
   <!-- en-tête -->
   <header class="topbar">
     <a class="brand" href="#" data-action="home" aria-label="GARO — accueil">
-      <span class="brand__mark"><i></i></span>
-      <span class="brand__name">GARO</span>
+      <svg class="brand__logo" viewBox="-4 -4 494 108" role="img" aria-label="GARO"><g fill="none" stroke-linecap="butt" stroke-miterlimit="10"><g stroke="var(--gold)" stroke-width="6"><path class="lg-s" d="M86 19.79 A47 47 0 1 0 97 50 H52"/></g><g stroke="var(--gold)" stroke-width="3"><path class="lg-s lg-t" d="M57 52.5 V68"/><path class="lg-s lg-t" d="M66.33 52.5 V68"/><path class="lg-s lg-t" d="M75.67 52.5 V68"/><path class="lg-s lg-t" d="M85 52.5 V68"/></g><g stroke="currentColor" stroke-width="6"><path class="lg-s" d="M140 100 L185 0 L230 100"/><path class="lg-s" d="M158 62 H212"/><path class="lg-s" d="M270 100 V0 H306 A27 27 0 0 1 306 54 H270"/><path class="lg-s" d="M300 54 L344 100"/><path class="lg-s" d="M483 50 A47 47 0 1 0 389 50 A47 47 0 1 0 483 50"/></g></g></svg>
     </a>
     <nav class="topnav">
       <a href="#processus" data-scroll>Processus</a>
@@ -52,7 +54,8 @@
 
   <!-- chargement -->
   <section class="screen screen--loader is-on" id="loader">
-    <div class="loader__brand"><span>G</span><span>A</span><span>R</span><span>O</span></div>
+    <div class="loader__brand"><svg class="loader__logo" viewBox="-4 -4 494 108" role="img" aria-label="GARO"><g fill="none" stroke-linecap="butt" stroke-miterlimit="10"><g stroke="var(--gold)" stroke-width="6"><path class="lg-s" d="M86 19.79 A47 47 0 1 0 97 50 H52"/></g><g stroke="var(--gold)" stroke-width="3"><path class="lg-s lg-t" d="M57 52.5 V68"/><path class="lg-s lg-t" d="M66.33 52.5 V68"/><path class="lg-s lg-t" d="M75.67 52.5 V68"/><path class="lg-s lg-t" d="M85 52.5 V68"/></g><g stroke="currentColor" stroke-width="6"><path class="lg-s" d="M140 100 L185 0 L230 100"/><path class="lg-s" d="M158 62 H212"/><path class="lg-s" d="M270 100 V0 H306 A27 27 0 0 1 306 54 H270"/><path class="lg-s" d="M300 54 L344 100"/><path class="lg-s" d="M483 50 A47 47 0 1 0 389 50 A47 47 0 1 0 483 50"/></g></g></svg></div>
+    <p class="loader__tag">Allons se garo.</p>
     <div class="loader__bar"><i id="loadBar"></i></div>
     <div class="loader__meta"><span id="loadText">Préparation du studio</span><span id="loadPct">0%</span></div>
   </section>
@@ -227,7 +230,7 @@
         </div>
       </div>
       <footer class="footer">
-        <div class="footer__brand" aria-label="GARO"><span data-split>GARO</span></div>
+        <div class="footer__brand"><svg class="footer__logo" viewBox="-4 -4 494 108" role="img" aria-label="GARO"><g fill="none" stroke-linecap="butt" stroke-miterlimit="10"><g stroke="var(--gold)" stroke-width="6"><path class="lg-s" d="M86 19.79 A47 47 0 1 0 97 50 H52"/></g><g stroke="var(--gold)" stroke-width="3"><path class="lg-s lg-t" d="M57 52.5 V68"/><path class="lg-s lg-t" d="M66.33 52.5 V68"/><path class="lg-s lg-t" d="M75.67 52.5 V68"/><path class="lg-s lg-t" d="M85 52.5 V68"/></g><g stroke="currentColor" stroke-width="6"><path class="lg-s" d="M140 100 L185 0 L230 100"/><path class="lg-s" d="M158 62 H212"/><path class="lg-s" d="M270 100 V0 H306 A27 27 0 0 1 306 54 H270"/><path class="lg-s" d="M300 54 L344 100"/><path class="lg-s" d="M483 50 A47 47 0 1 0 389 50 A47 47 0 1 0 483 50"/></g></g></svg></div>
         <div class="footer__cols">
           <div><span class="k">Produit</span><a href="#processus" data-scroll>Processus</a><a href="#collection" data-scroll>Collection</a><a href="#salons" data-scroll>Salons</a></div>
           <div><span class="k">Studio</span><span>Maison Akwaba</span><span>Démonstration</span></div>
@@ -257,7 +260,7 @@
   </div>
 
   <!-- rideau de transition -->
-  <div class="curtain" id="curtain" aria-hidden="true"><i class="curtain__gold"></i><i class="curtain__ink"><span>GARO</span></i></div>
+  <div class="curtain" id="curtain" aria-hidden="true"><i class="curtain__gold"></i><i class="curtain__ink"><span><svg class="curtain__logo" viewBox="-4 -4 494 108" role="img" aria-label="GARO"><g fill="none" stroke-linecap="butt" stroke-miterlimit="10"><g stroke="var(--gold)" stroke-width="6"><path class="lg-s" d="M86 19.79 A47 47 0 1 0 97 50 H52"/></g><g stroke="var(--gold)" stroke-width="3"><path class="lg-s lg-t" d="M57 52.5 V68"/><path class="lg-s lg-t" d="M66.33 52.5 V68"/><path class="lg-s lg-t" d="M75.67 52.5 V68"/><path class="lg-s lg-t" d="M85 52.5 V68"/></g><g stroke="currentColor" stroke-width="6"><path class="lg-s" d="M140 100 L185 0 L230 100"/><path class="lg-s" d="M158 62 H212"/><path class="lg-s" d="M270 100 V0 H306 A27 27 0 0 1 306 54 H270"/><path class="lg-s" d="M300 54 L344 100"/><path class="lg-s" d="M483 50 A47 47 0 1 0 389 50 A47 47 0 1 0 483 50"/></g></g></svg></span></i></div>
 
   <!-- scan -->
   <section class="screen screen--scan" id="scan">

@@ -104,8 +104,9 @@ svg { display: block; }
 
 /* loader */
 .screen--loader { display: grid; place-content: center; gap: 26px; z-index: 80; background: var(--ink); }
-.loader__brand { display: flex; gap: 0.06em; font-family: var(--serif); font-size: clamp(64px, 12vw, 180px); letter-spacing: 0.08em; line-height: 1; overflow: hidden; }
-.loader__brand span { display: inline-block; transform: translateY(105%); }
+.loader__brand { width: min(560px, 74vw); color: var(--ivory); }
+.loader__logo { display: block; width: 100%; height: auto; overflow: visible; }
+.loader__tag { margin: -6px 0 0; font-family: var(--serif); font-style: italic; font-size: clamp(18px, 2vw, 26px); color: var(--gold); opacity: 0; }
 .loader__bar { height: 1px; background: var(--line); overflow: hidden; }
 .loader__bar i { display: block; height: 100%; width: 100%; background: var(--gold); transform: scaleX(0); transform-origin: left; }
 .loader__meta { display: flex; justify-content: space-between; font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); }
@@ -280,3 +281,8 @@ svg { display: block; }
 @media (prefers-reduced-motion: reduce) {
   .bg__glow, .bg__rings span, .grain, .brand__mark i { animation: none !important; }
 }
+
+/* logo GARO (monogramme G-peigne + ARO) */
+.brand__logo { display: block; height: 20px; width: auto; overflow: visible; color: var(--ivory); transition: color 0.5s; }
+.brand:hover .lg-t { transform: translateY(2px); }
+.lg-t { transition: transform 0.5s var(--ease); }

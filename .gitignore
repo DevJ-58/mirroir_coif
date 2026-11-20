@@ -1,3 +1,7 @@
 node_modules
 dist
 scratch
+
+# identité et vidéos : restent en local (hors GitHub)
+brand/
+video/
