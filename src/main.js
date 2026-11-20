@@ -7,7 +7,7 @@ import { alignLandmarks } from './three/head.js';
 import { STYLES, CATEGORIES, COLORS } from './data/catalog.js';
 import { runVideoScan, scanImage, sampleSkin, loadLandmarker } from './scan/scanner.js';
 import { initCursor, initMagnetic, setCursor } from './ui/cursor.js';
-import { createSite } from './site/site.js';
+import { createSite, curtain } from './site/site.js';
 
 if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
 window.scrollTo(0, 0);
@@ -37,7 +37,7 @@ const state = {
 // balancement de l'avatar (accueil) + parallaxe souris
 const mouse = { x: 0, y: 0, sx: 0, sy: 0 };
 window.addEventListener('pointermove', (e) => { mouse.x = e.clientX / window.innerWidth - 0.5; mouse.y = e.clientY / window.innerHeight - 0.5; });
-const site = createSite({ stage, avatar, hair, STYLES, COLORS, mouse });
+const site = createSite({ stage, avatar, hair, STYLES, COLORS, mouse, onTry: (id) => tryStyle(id) });
 stage.onTick((dt, t) => {
   mouse.sx += (mouse.x - mouse.sx) * 0.05; mouse.sy += (mouse.y - mouse.sy) * 0.05;
   if (state.idle) {
@@ -93,58 +93,81 @@ window.addEventListener('resize', () => {
 });
 
 // ---------- chargement ----------
+// Seules les coiffures de l'accueil sont construites avant l'ouverture ;
+// les autres se construisent ensuite en arrière-plan, une par une.
+const FIRST = ['box-braids', 'afro'];
 async function boot() {
   const letters = $$('.loader__brand span');
   gsap.to(letters, { y: 0, duration: 1.2, ease: 'expo.out', stagger: 0.06 });
   const bar = $('#loadBar'), pct = $('#loadPct'), txt = $('#loadText');
   const setP = (p, label) => { gsap.to(bar, { scaleX: p, duration: 0.5, ease: 'power2.out' }); pct.textContent = `${Math.round(p * 100)}%`; if (label) txt.textContent = label; };
+  const q = new URLSearchParams(location.search);
+  const qs = STYLES.find((s) => s.id === q.get('style'));
+  if (qs) state.selected = qs;
   await nextFrame();
-  setP(0.08, 'Sculpture du mannequin');
-  await wait(300);
-  const total = STYLES.length;
-  for (let i = 0; i < total; i++) {
-    setP(0.1 + (i / total) * 0.62, `Coiffure · ${STYLES[i].name}`);
+  setP(0.15, 'Sculpture du mannequin');
+  await wait(250);
+  const first = [...new Set([...FIRST, state.selected.id])].map((id) => STYLES.find((s) => s.id === id));
+  for (let i = 0; i < first.length; i++) {
+    setP(0.25 + (i / first.length) * 0.5, `Coiffure · ${first[i].name}`);
     await nextFrame();
-    hair.get(STYLES[i]);
+    compileStyle(first[i]);
   }
-  setP(0.75, 'Compilation des matières');
-  // compile les shaders en affichant chaque coiffure une fois
-  for (const s of STYLES) hair.show(s, 'instant');
-  stage.renderer.compile(stage.scene, stage.camera);
-  hair.show(null);
+  setP(0.9, 'Lumières du studio');
   await nextFrame();
-  setP(0.85, 'Vignettes de la collection');
-  await renderThumbs();
   setP(1, 'Studio prêt');
-  loadLandmarker().catch(() => {}); // préchargement silencieux du scanner
-  await wait(450);
+  await wait(380);
 
   gsap.to(letters, { y: '-105%', duration: 0.8, ease: 'expo.in', stagger: 0.04 });
   gsap.to('#loader', { autoAlpha: 0, duration: 0.9, delay: 0.6, ease: 'power2.inOut', onComplete: () => $('#loader').remove() });
   await wait(700);
-  // liens directs (borne / tests) : ?studio&style=afro
-  const q = new URLSearchParams(location.search);
-  const qs = STYLES.find((s) => s.id === q.get('style'));
-  if (qs) state.selected = qs;
   document.body.classList.remove('is-loading');
   if (q.has('studio')) { document.body.classList.add('app-mode'); enterStudio(); } else enterSite(true);
+  backgroundBuild();
+}
+
+/** Construit une coiffure et compile ses matières sans l'afficher. */
+function compileStyle(s) {
+  const h = hair.get(s);
+  if (h.compiled) return;
+  const vis = h.group.visible;
+  h.group.visible = true;
+  stage.renderer.compile(stage.scene, stage.camera);
+  h.group.visible = vis;
+  h.compiled = true;
+}
+
+async function backgroundBuild() {
+  await wait(1800);
+  for (const s of STYLES) {
+    if (hair.cache.get(s.id)?.compiled) continue;
+    await idle();
+    compileStyle(s);
+  }
+  loadLandmarker().catch(() => {}); // préchargement silencieux du scanner
+  await idle();
+  await renderThumbs();
+}
+function idle() {
+  return new Promise((r) => (window.requestIdleCallback ? requestIdleCallback(() => r(), { timeout: 400 }) : setTimeout(r, 120)));
 }
 
 // ---------- site vitrine ----------
 function enterSite(first = false) {
   show('site');
   state.idle = false;
-  if (first) site.intro(); else {
-    site.enter();
-    gsap.fromTo('.site, .rail', { opacity: 0 }, { opacity: 1, duration: 1, ease: 'power2.out' });
-  }
+  if (first) site.intro(); else site.enter();
 }
-async function leaveSite() {
-  site.leave();
-  document.body.classList.remove('app-mode');
-  await gsap.to('.site, .rail', { opacity: 0, duration: 0.5, ease: 'power2.in' });
-  document.body.classList.add('app-mode');
-  gsap.set('.site, .rail', { opacity: 1 });
+function leaveSite() { site.leave(); }
+
+/** Ouvre le studio directement sur un style (depuis la collection du site). */
+function tryStyle(id) {
+  const s = STYLES.find((x) => x.id === id); if (!s) return;
+  curtain(async () => {
+    site.leave();
+    state.selected = s;
+    enterStudio();
+  });
 }
 
 // ---------- scan ----------
@@ -164,7 +187,7 @@ function setRing(p) {
 }
 
 async function enterScan() {
-  if (state.screen === 'site') await leaveSite();
+  if (state.screen === 'site') leaveSite();
   if (state.screen === 'studio') await leaveStudio();
   show('scan');
   state.idle = true;
@@ -327,29 +350,28 @@ function buildPanel() {
 }
 buildPanel();
 
+// Vignettes rendues hors écran, une par image, sans perturber la scène affichée.
 async function renderThumbs() {
   const cam = new THREE.PerspectiveCamera(30, 1, 1, 1000);
   cam.position.set(30, 9, 82);
   cam.lookAt(0, 0.5, 0);
-  const savedRot = stage.root.rotation.clone(), savedY = stage.root.position.y;
-  const savedCurrent = hair.current;
-  const savedReveal = avatar.uniforms.uReveal.value;
-  avatar.uniforms.uReveal.value = 1;
-  stage.root.rotation.set(0, 0, 0); stage.root.position.y = -1.5;
   const thumbs = {};
   for (const s of STYLES) {
-    hair.show(s, 'instant');
-    const url = stage.renderThumb(cam, 280);
-    thumbs[s.id] = url;
+    const h = hair.get(s);
+    // état courant sauvegardé
+    const saved = [...hair.cache.values()].map((x) => [x, x.group.visible, x.common.uGrow.value, x.group.position.y, x.group.scale.x]);
+    const rot = stage.root.rotation.clone(), py = stage.root.position.y, rev = avatar.uniforms.uReveal.value;
+    for (const [x] of saved) x.group.visible = false;
+    h.group.visible = true; h.common.uGrow.value = 1; h.group.position.y = 0; h.group.scale.setScalar(1);
+    stage.root.rotation.set(0, 0, 0); stage.root.position.y = -1.5; avatar.uniforms.uReveal.value = 1;
+    thumbs[s.id] = stage.renderThumb(cam, 280);
+    for (const [x, v, g, y, sc] of saved) { x.group.visible = v; x.common.uGrow.value = g; x.group.position.y = y; x.group.scale.setScalar(sc); }
+    stage.root.rotation.copy(rot); stage.root.position.y = py; avatar.uniforms.uReveal.value = rev;
     const img = $(`.card[data-id="${s.id}"] img`);
-    if (img) { img.src = url; img.classList.add('ready'); img.previousElementSibling?.remove(); }
+    if (img) { img.src = thumbs[s.id]; img.classList.add('ready'); img.previousElementSibling?.remove(); }
     await nextFrame();
   }
   site.setThumbs(thumbs);
-  hair.show(null, 'instant');
-  if (savedCurrent) { hair.current = null; hair.show(STYLES.find((s) => s.id === savedCurrent), 'instant'); }
-  stage.root.rotation.copy(savedRot); stage.root.position.y = savedY;
-  avatar.uniforms.uReveal.value = savedReveal;
 }
 
 function enterStudio() {
@@ -553,16 +575,28 @@ document.addEventListener('click', async (e) => {
   const a = el.dataset.action;
   if (el.tagName === 'A') e.preventDefault();
   switch (a) {
-    case 'scan': enterScan(); break;
-    case 'mannequin':
-      stopScan();
-      if (state.screen === 'site') await leaveSite();
-      if (state.scanned) { avatar.setMannequin(); avatar.scan = null; state.scanned = false; renderThumbs(); }
-      enterStudio(); break;
+    case 'scan':
+      if (state.screen === 'site') curtain(async () => { enterScan(); await wait(60); });
+      else enterScan();
+      break;
+    case 'mannequin': {
+      const go = () => {
+        stopScan();
+        if (state.screen === 'site') leaveSite();
+        if (state.scanned) { avatar.setMannequin(); avatar.scan = null; state.scanned = false; renderThumbs(); }
+        enterStudio();
+      };
+      if (state.screen === 'site') curtain(async () => go()); else go();
+      break;
+    }
     case 'home':
-      stopScan(); stopPresent();
-      if (state.screen === 'studio') await leaveStudio();
-      if (state.screen !== 'site') enterSite();
+      if (state.screen === 'site') break;
+      curtain(async () => {
+        stopScan(); stopPresent();
+        stage.controls.enabled = false; stage.controls.autoRotate = false;
+        $('[data-action="rotate"]').classList.remove('is-on');
+        enterSite();
+      });
       break;
     case 'rotate': {
       const on = !stage.controls.autoRotate;

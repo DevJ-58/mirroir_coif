@@ -14,6 +14,7 @@
 <body data-screen="loader" class="is-loading">
   <!-- arrière-plan -->
   <div class="bg" aria-hidden="true">
+    <div class="bg__tint" id="bgTint"></div>
     <div class="bg__glow bg__glow--a"></div>
     <div class="bg__glow bg__glow--b"></div>
     <div class="bg__glow bg__glow--c"></div>
@@ -43,6 +44,7 @@
     <div class="topbar__right">
       <span class="topbar__step" id="stepLabel">Accueil</span>
       <button class="topbar__cta" data-action="scan"><span>Essayer</span></button>
+      <button class="burger" id="burger" aria-label="Menu" aria-expanded="false"><i></i><i></i></button>
       <button class="topbar__close" data-action="home"><span>Retour au site</span><i>✕</i></button>
     </div>
   </header>
@@ -60,7 +62,7 @@
     <!-- HERO -->
     <section class="s s-hero" id="top" data-label="Accueil">
       <div class="hero-meta hero-meta--l">
-        <span class="k">N° 01</span>
+        <span class="k">N° 01 — 2026</span>
         <span>Essayage capillaire 3D<br />pour salons de coiffure</span>
       </div>
       <div class="hero-meta hero-meta--r">
@@ -73,11 +75,11 @@
         <span class="ht ht--2"><em data-split>avant</em> <span data-split>les ciseaux.</span></span>
       </h1>
       <div class="hero-bottom">
-        <p class="hero-lede" data-reveal>Un scan de quatre secondes, un avatar qui vous ressemble, toute la carte du salon portée à 360°.</p>
-        <div class="hero-cta" data-reveal>
+        <p class="hero-lede" data-hero>Un scan de quatre secondes, un avatar qui vous ressemble, toute la carte du salon portée à 360°.</p>
+        <div class="hero-cta" data-hero>
           <button class="btn btn--primary magnetic" data-action="scan"><span class="btn__bg"></span><span class="btn__label">Lancer l’expérience</span><span class="btn__dot"></span></button>
         </div>
-        <div class="scroll-cue" aria-hidden="true"><span>Défiler</span><i></i></div>
+        <div class="scroll-cue" data-hero aria-hidden="true"><span>Défiler</span><i></i></div>
       </div>
     </section>
 
@@ -86,31 +88,38 @@
 
     <!-- MANIFESTE -->
     <section class="s s-manifesto" id="manifeste" data-label="Manifeste">
-      <p class="eyebrow"><span class="eyebrow__line"></span>Le constat</p>
-      <p class="manifesto" id="manifesto">« Est-ce que ça m’irait ? » Chaque jour, la même question au fauteuil. MIROIR transforme l’hésitation en certitude : votre client voit son visage, sa coupe, sous tous les angles, avant le premier coup de ciseaux.</p>
-      <div class="manifesto-sign"><span class="k">MIROIR</span><span>Studio capillaire virtuel — 2026</span></div>
+      <div class="manifesto-wrap">
+        <p class="eyebrow"><span class="eyebrow__line"></span>02 — Le constat</p>
+        <p class="manifesto" id="manifesto">« Est-ce que ça m’irait ? » Chaque jour, la même question au fauteuil. MIROIR transforme l’hésitation en certitude : votre client voit son visage, sa coupe, sous tous les angles, avant le premier coup de ciseaux.</p>
+        <div class="manifesto-sign"><span class="k">MIROIR</span><span>Studio capillaire virtuel</span></div>
+      </div>
     </section>
 
     <!-- PROCESSUS (épinglé) -->
     <section class="s s-process" id="processus" data-label="Processus">
       <div class="process-pin">
+        <div class="scanframe" id="scanframe" aria-hidden="true">
+          <i></i><i></i><i></i><i></i>
+          <span class="scanframe__line"></span>
+          <span class="scanframe__label">Scan · <b id="scanPct">000</b> / 468</span>
+        </div>
         <div class="process-head">
-          <p class="eyebrow"><span class="eyebrow__line"></span>Comment ça marche</p>
+          <p class="eyebrow"><span class="eyebrow__line"></span>03 — Comment ça marche</p>
           <div class="process-count"><span id="procNum">01</span><i></i><span>03</span></div>
         </div>
         <div class="process-steps">
           <article class="pstep is-on" data-step="0">
-            <span class="pstep__n">01</span>
+            <span class="pstep__n">Étape 01</span>
             <h2 class="pstep__t">Scanner.</h2>
             <p class="pstep__d">Une caméra, quatre secondes. 468 repères du visage sont analysés directement sur l’appareil : aucune image ne quitte le salon.</p>
           </article>
           <article class="pstep" data-step="1">
-            <span class="pstep__n">02</span>
+            <span class="pstep__n">Étape 02</span>
             <h2 class="pstep__t">Sculpter.</h2>
             <p class="pstep__d">Le visage devient un avatar 3D : volume, proportions, carnation. Un double fidèle, prêt à être coiffé.</p>
           </article>
           <article class="pstep" data-step="2">
-            <span class="pstep__n">03</span>
+            <span class="pstep__n">Étape 03</span>
             <h2 class="pstep__t">Essayer.</h2>
             <p class="pstep__d">Survolez un style, il se pose. Tournez, comparez les teintes, choisissez. La décision se prend en confiance.</p>
           </article>
@@ -123,7 +132,7 @@
     <section class="s s-collection" id="collection" data-label="Collection">
       <div class="coll-pin">
         <div class="coll-head">
-          <p class="eyebrow"><span class="eyebrow__line"></span>La collection</p>
+          <p class="eyebrow"><span class="eyebrow__line"></span>04 — La collection</p>
           <h2 class="h2" data-split-lines>Douze signatures,<br /><em>une seule séance.</em></h2>
         </div>
         <div class="coll-name" id="collName" aria-hidden="true"></div>
@@ -135,16 +144,21 @@
     <!-- 360 -->
     <section class="s s-360" id="rotation" data-label="360°">
       <div class="r360-pin">
-        <div class="r360-deg"><span id="deg">000</span><sup>°</sup></div>
+        <svg class="dial" id="dial" viewBox="0 0 400 400" aria-hidden="true">
+          <circle cx="200" cy="200" r="196" class="dial__track" />
+          <circle cx="200" cy="200" r="196" class="dial__prog" id="dialProg" />
+          <g id="dialTicks"></g>
+        </svg>
+        <div class="r360-deg" aria-hidden="true"><span id="deg">000</span><sup>°</sup></div>
         <div class="r360-copy">
-          <p class="eyebrow"><span class="eyebrow__line"></span>Sous tous les angles</p>
+          <p class="eyebrow"><span class="eyebrow__line"></span>05 — Sous tous les angles</p>
           <h2 class="h2" data-split-lines>Face, profil, nuque.<br /><em>Rien n’est caché.</em></h2>
         </div>
         <ul class="r360-marks">
-          <li data-at="0"><b>000°</b>Face — symétrie et contour</li>
-          <li data-at="0.25"><b>090°</b>Profil — volume et tombé</li>
-          <li data-at="0.5"><b>180°</b>Nuque — finitions</li>
-          <li data-at="0.75"><b>270°</b>Profil — équilibre</li>
+          <li data-at="0"><b>000°</b><span>Face</span></li>
+          <li data-at="0.25"><b>090°</b><span>Profil</span></li>
+          <li data-at="0.5"><b>180°</b><span>Nuque</span></li>
+          <li data-at="0.75"><b>270°</b><span>Profil</span></li>
         </ul>
       </div>
     </section>
@@ -153,10 +167,11 @@
     <section class="s s-colors" id="teintes" data-label="Teintes">
       <div class="colors-pin">
         <div class="colors-copy">
-          <p class="eyebrow"><span class="eyebrow__line"></span>Teintes</p>
+          <p class="eyebrow"><span class="eyebrow__line"></span>06 — Teintes</p>
           <h2 class="h2" data-split-lines>Sept nuances,<br /><em>un seul geste.</em></h2>
           <p class="body">Du noir ébène au blond polaire, chaque teinte se dépose sur l’avatar avec ses reflets. Le client voit le résultat, le coloriste aussi.</p>
         </div>
+        <div class="colors-now"><span class="k">Teinte</span><span id="colorNow">Noir ébène</span></div>
         <ol class="colors-list" id="colorsList"></ol>
       </div>
     </section>
@@ -165,21 +180,21 @@
     <section class="s s-salons" id="salons" data-label="Salons">
       <div class="salons-inner">
         <div class="salons-head">
-          <p class="eyebrow eyebrow--dark"><span class="eyebrow__line"></span>Pour les salons</p>
+          <p class="eyebrow eyebrow--dark"><span class="eyebrow__line"></span>07 — Pour les salons</p>
           <h2 class="h2 h2--dark" data-split-lines>Votre carte,<br /><em>sur chaque écran.</em></h2>
           <p class="body body--dark">MIROIR s’installe sur le matériel que vous avez déjà. Vous gérez vos styles, vos prix et vos durées ; vos clients essayent, puis réservent.</p>
         </div>
-        <div class="devices">
+        <div class="devices" id="devices">
           <article class="device" data-reveal>
-            <svg viewBox="0 0 120 90"><rect x="22" y="8" width="76" height="74" rx="8"/><rect x="28" y="14" width="64" height="58" rx="2" class="scr"/><circle cx="60" cy="77" r="1.6"/></svg>
+            <div class="dv dv--tablet"><div class="dv__screen"><img alt="" /><img alt="" /></div></div>
             <h3>Tablette</h3><p>Au poste d’accueil ou directement au fauteuil.</p>
           </article>
           <article class="device" data-reveal>
-            <svg viewBox="0 0 120 90"><rect x="8" y="10" width="104" height="60" rx="4"/><rect x="13" y="15" width="94" height="50" rx="1" class="scr"/><path d="M48 80h24M60 70v10"/></svg>
+            <div class="dv dv--tv"><div class="dv__screen"><img alt="" /><img alt="" /></div><span class="dv__stand"></span></div>
             <h3>Écran TV</h3><p>En vitrine, pour attirer les passants.</p>
           </article>
           <article class="device" data-reveal>
-            <svg viewBox="0 0 120 90"><rect x="40" y="4" width="40" height="66" rx="5"/><rect x="45" y="9" width="30" height="48" rx="1" class="scr"/><path d="M52 70l-4 16h24l-4-16"/></svg>
+            <div class="dv dv--kiosk"><div class="dv__screen"><img alt="" /><img alt="" /></div><span class="dv__base"></span></div>
             <h3>Borne</h3><p>En libre-service, dans la salle d’attente.</p>
           </article>
         </div>
@@ -200,18 +215,20 @@
 
     <!-- CTA FINAL -->
     <section class="s s-final" id="essayer" data-label="Essayer">
-      <p class="eyebrow eyebrow--center"><span class="eyebrow__line"></span>À vous</p>
-      <h2 class="final-title"><span data-split>Essayez.</span></h2>
-      <div class="final-cta">
-        <button class="btn btn--primary magnetic" data-action="scan"><span class="btn__bg"></span><span class="btn__label">Scanner mon visage</span><span class="btn__dot"></span></button>
-        <button class="btn btn--ghost magnetic" data-action="mannequin"><span class="btn__label">Explorer sur le mannequin</span></button>
+      <div class="final-inner">
+        <p class="eyebrow eyebrow--center"><span class="eyebrow__line"></span>08 — À vous</p>
+        <h2 class="final-title"><span data-split>Essayez.</span></h2>
+        <div class="final-cta">
+          <button class="btn btn--primary magnetic" data-action="scan"><span class="btn__bg"></span><span class="btn__label">Scanner mon visage</span><span class="btn__dot"></span></button>
+          <button class="btn btn--ghost magnetic" data-action="mannequin"><span class="btn__label">Explorer sur le mannequin</span></button>
+        </div>
       </div>
       <footer class="footer">
-        <div class="footer__brand">MIROIR</div>
+        <div class="footer__brand" aria-label="MIROIR"><span data-split>MIROIR</span></div>
         <div class="footer__cols">
           <div><span class="k">Produit</span><a href="#processus" data-scroll>Processus</a><a href="#collection" data-scroll>Collection</a><a href="#salons" data-scroll>Salons</a></div>
           <div><span class="k">Studio</span><span>Maison Akwaba</span><span>Démonstration</span></div>
-          <div><span class="k">©</span><span>2026 MIROIR</span><span>Tous droits réservés</span></div>
+          <div><span class="k">©</span><span>2026 MIROIR</span><a href="#top" data-scroll>Haut de page ↑</a></div>
         </div>
       </footer>
     </section>
@@ -219,6 +236,25 @@
 
   <!-- indicateur de progression -->
   <nav class="rail" id="rail" aria-label="Sections"></nav>
+
+  <!-- menu mobile -->
+  <div class="menu" id="menu" aria-hidden="true">
+    <div class="menu__bg"></div>
+    <nav class="menu__links">
+      <a href="#top" data-scroll><i>01</i><span>Accueil</span></a>
+      <a href="#processus" data-scroll><i>02</i><span>Processus</span></a>
+      <a href="#collection" data-scroll><i>03</i><span>Collection</span></a>
+      <a href="#rotation" data-scroll><i>04</i><span>360°</span></a>
+      <a href="#teintes" data-scroll><i>05</i><span>Teintes</span></a>
+      <a href="#salons" data-scroll><i>06</i><span>Salons</span></a>
+    </nav>
+    <div class="menu__foot">
+      <button class="btn btn--primary" data-action="scan"><span class="btn__bg"></span><span class="btn__label">Lancer l’expérience</span><span class="btn__dot"></span></button>
+    </div>
+  </div>
+
+  <!-- rideau de transition -->
+  <div class="curtain" id="curtain" aria-hidden="true"><i class="curtain__gold"></i><i class="curtain__ink"><span>MIROIR</span></i></div>
 
   <!-- scan -->
   <section class="screen screen--scan" id="scan">
