@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { buildHeadGeometry, canonicalVerts, capeProfile, CAPE_C } from './head.js';
+import { buildHeadGeometry, canonicalVerts, capeProfile, CAPE_C, setSkullScale } from './head.js';
 
 const MANNEQUIN = new THREE.Color('#cdbfb0');
 
@@ -10,6 +10,7 @@ export class Avatar {
       uSkin: { value: MANNEQUIN.clone() },
       uFaceMap: { value: null },
       uHasMap: { value: 0 },
+      uHasCol: { value: 0 }, // 1 = couleurs projetées depuis les prises du scan
       uReveal: { value: 1 }, // 1 = entièrement visible
       uGlow: { value: new THREE.Color('#f3d9a8') },
     };
@@ -25,12 +26,15 @@ export class Avatar {
     earGeo.scale(0.55, 3.0, 1.75);
     earGeo.setAttribute('aFace', new THREE.BufferAttribute(new Float32Array(earGeo.attributes.position.count), 1));
     earGeo.setAttribute('aUv', new THREE.BufferAttribute(new Float32Array(earGeo.attributes.position.count * 2), 2));
+    earGeo.setAttribute('aCol', new THREE.BufferAttribute(new Float32Array(earGeo.attributes.position.count * 3), 3));
     for (const s of [-1, 1]) {
       const ear = new THREE.Mesh(earGeo, this.skinMat);
       ear.position.set(s * 7.75, 1.0, -4.4);
       ear.rotation.set(-0.12, s * 0.32, s * -0.06);
       this.group.add(ear);
     }
+    this.currentHair = null; // cheveux réels de la personne scannée
+    this.hairShown = true;
 
     this.cape = new THREE.Mesh(buildCapeGeometry(), this._makeCapeMaterial());
     this.group.add(this.cape);
@@ -61,16 +65,18 @@ export class Avatar {
     });
     m.onBeforeCompile = (shader) => {
       Object.assign(shader.uniforms, {
-        uSkin: this.uniforms.uSkin, uFaceMap: this.uniforms.uFaceMap, uHasMap: this.uniforms.uHasMap,
+        uSkin: this.uniforms.uSkin, uFaceMap: this.uniforms.uFaceMap, uHasMap: this.uniforms.uHasMap, uHasCol: this.uniforms.uHasCol,
       });
       shader.vertexShader = shader.vertexShader
-        .replace('#include <common>', '#include <common>\nattribute vec2 aUv; attribute float aFace; varying vec2 vFUv; varying float vFace;')
-        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvFUv = aUv; vFace = aFace;');
+        .replace('#include <common>', '#include <common>\nattribute vec2 aUv; attribute float aFace; attribute vec3 aCol; varying vec2 vFUv; varying float vFace; varying vec3 vCol;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvFUv = aUv; vFace = aFace; vCol = aCol;');
       shader.fragmentShader = shader.fragmentShader
-        .replace('#include <common>', '#include <common>\nuniform vec3 uSkin; uniform sampler2D uFaceMap; uniform float uHasMap; varying vec2 vFUv; varying float vFace;')
+        .replace('#include <common>', '#include <common>\nuniform vec3 uSkin; uniform sampler2D uFaceMap; uniform float uHasMap; uniform float uHasCol; varying vec2 vFUv; varying float vFace; varying vec3 vCol;')
         .replace('#include <map_fragment>', `
           vec3 faceC = texture2D(uFaceMap, vFUv).rgb;
-          diffuseColor.rgb = mix(uSkin, faceC, clamp(vFace * uHasMap, 0.0, 1.0));`);
+          diffuseColor.rgb = mix(uSkin, faceC, clamp(vFace * uHasMap, 0.0, 1.0));
+          // scan multi-vues : couleur projetée sur toute la tête (les oreilles gardent le teint moyen)
+          if (uHasCol > 0.5 && dot(vCol, vCol) > 0.0) diffuseColor.rgb = vCol;`);
       this._injectReveal(shader);
     };
     return m;
@@ -87,6 +93,10 @@ export class Avatar {
   }
 
   setMannequin() {
+    setSkullScale(1);
+    this._setCurrentHair(null);
+    this.scan = null;
+    this.uniforms.uHasCol.value = 0;
     this._setGeometry(canonicalVerts(), null);
     this.uniforms.uSkin.value.copy(MANNEQUIN);
     this.uniforms.uHasMap.value = 0;
@@ -95,28 +105,50 @@ export class Avatar {
     this.realistic = false;
   }
 
-  /** scan = { verts, uvs, texture, skin } */
+  /** scan : résultat de reconstruct() (forme, couleurs projetées, cheveux actuels) */
   setScan(scan) {
     this.scan = scan;
-    this._setGeometry(scan.verts, scan.uvs);
+    setSkullScale(scan.skullScale);
+    // maillage plus fin : les couleurs sont portées par les sommets
+    const g = buildHeadGeometry(scan.verts, null, { NT: 380, NY: 420 });
+    scan.colorizeHead(g);
+    this.head.geometry.dispose();
+    this.head.geometry = g;
+    this._setCurrentHair(scan.buildHairShell());
     this.showRealistic(true);
   }
+
+  _setCurrentHair(mesh) {
+    if (this.currentHair) { this.group.remove(this.currentHair); this.currentHair.geometry.dispose(); this.currentHair.material.dispose(); }
+    this.currentHair = mesh;
+    if (mesh) {
+      const prev = mesh.material.onBeforeCompile;
+      mesh.material.onBeforeCompile = (sh) => { prev(sh); this._injectReveal(sh); };
+      this.group.add(mesh);
+    }
+    this._syncHair();
+  }
+  /** Affiche ou masque les cheveux réels (masqués dès qu'une coiffure est posée). */
+  showCurrentHair(on) { this.hairShown = on; this._syncHair(); }
+  _syncHair() { if (this.currentHair) this.currentHair.visible = this.hairShown && this.realistic; }
 
   showRealistic(on) {
     if (!this.scan) return;
     this.realistic = on;
     if (on) {
-      this.uniforms.uFaceMap.value = this.scan.texture;
-      this.uniforms.uHasMap.value = 1;
+      this.uniforms.uHasCol.value = 1;
+      this.uniforms.uHasMap.value = 0;
       this.uniforms.uSkin.value.copy(this.scan.skin);
       this.skinMat.roughness = 0.58;
       this.skinMat.clearcoat = 0.12;
     } else {
       this.uniforms.uHasMap.value = 0;
+      this.uniforms.uHasCol.value = 0;
       this.uniforms.uSkin.value.copy(MANNEQUIN);
       this.skinMat.roughness = 0.42;
       this.skinMat.clearcoat = 0.35;
     }
+    this._syncHair();
   }
 
   _setGeometry(verts, uvs) {

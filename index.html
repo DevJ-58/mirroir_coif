@@ -95,7 +95,7 @@
         <span class="ht ht--3" data-split>ciseaux.</span>
       </h1>
       <div class="hero-bottom">
-        <p class="hero-lede" data-hero>Un scan de quatre secondes, un avatar qui vous ressemble, toute la carte du salon portée à 360°.</p>
+        <p class="hero-lede" data-hero>Cinq prises de votre tête, un avatar qui vous ressemble, cheveux compris, toute la carte du salon portée à 360°.</p>
         <div class="hero-cta" data-hero>
           <button class="btn btn--primary magnetic" data-action="scan"><span class="btn__bg"></span><span class="btn__label">Lancer l’expérience</span><span class="btn__dot"></span></button>
         </div>
@@ -131,7 +131,7 @@
           <article class="pstep is-on" data-step="0">
             <span class="pstep__n">Étape 01</span>
             <h2 class="pstep__t">Scanner.</h2>
-            <p class="pstep__d">Une caméra, quatre secondes. 468 repères du visage sont analysés directement sur l’appareil : aucune image ne quitte le salon.</p>
+            <p class="pstep__d">Une caméra, cinq angles : face, trois-quarts, profils. Le visage, le crâne et les cheveux sont mesurés sur l’appareil : aucune image ne quitte le salon.</p>
           </article>
           <article class="pstep" data-step="1">
             <span class="pstep__n">Étape 02</span>
@@ -236,7 +236,7 @@
           <li data-reveal><b>La confidentialité</b><span>Le scan est calculé sur l’appareil, rien n’est stocké.</span></li>
         </ul>
         <div class="facts">
-          <div data-reveal><b data-count="4">0</b><span>secondes de scan</span></div>
+          <div data-reveal><b data-count="5">0</b><span>prises de la tête</span></div>
           <div data-reveal><b data-count="468">0</b><span>repères du visage</span></div>
           <div data-reveal><b data-count="360">0</b><span>degrés de rotation</span></div>
           <div data-reveal><b data-count="0">0</b><span>image envoyée</span></div>
@@ -306,13 +306,13 @@
       </svg>
     </div>
     <div class="scan__copy">
-      <div class="scan__steps" id="scanSteps"><i></i><i></i><i></i><i></i></div>
+      <div class="scan__steps" id="scanSteps"><i></i><i></i><i></i><i></i><i></i></div>
       <h2 class="scan__title" id="scanTitle">Préparation</h2>
       <p class="scan__hint" id="scanHint">Autorisez l’accès à la caméra. Le traitement reste sur cet appareil.</p>
       <p class="scan__status" id="scanStatus"></p>
     </div>
     <div class="scan__actions">
-      <label class="link-btn"><input type="file" accept="image/*" id="photoInput" hidden />Importer une photo</label>
+      <label class="link-btn"><input type="file" accept="image/*" id="photoInput" multiple hidden />Importer des photos</label>
       <button class="link-btn" data-action="mannequin">Passer, utiliser le mannequin</button>
       <button class="link-btn" data-action="home">Annuler</button>
     </div>
@@ -326,10 +326,10 @@
       <div class="gen__pct"><span id="genPct">0</span><sup>%</sup></div>
     </div>
     <ul class="gen__list" id="genList">
-      <li>Analyse des 468 repères du visage</li>
-      <li>Reconstruction du volume crânien</li>
-      <li>Projection de la texture de peau</li>
-      <li>Calibration des coiffures</li>
+      <li>Orientation des cinq prises</li>
+      <li>Séparation cheveux, peau et fond</li>
+      <li>Volume du crâne et des cheveux</li>
+      <li>Peau projetée tout autour, coiffures ajustées</li>
     </ul>
   </section>
 
@@ -347,6 +347,7 @@
       <div class="details__index"><span id="dIndex">01</span><i></i><span id="dTotal">11</span></div>
       <h2 class="details__name" id="dName">—</h2>
       <p class="details__desc" id="dDesc"></p>
+      <p class="details__adapt" id="dAdapt" hidden></p>
       <div class="details__meta">
         <div><span>Durée</span><b id="dDur">—</b></div>
         <div><span>Tarif</span><b><span id="dPrice">—</span> <small>FCFA</small></b></div>

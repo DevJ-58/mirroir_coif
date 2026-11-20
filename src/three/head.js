@@ -30,8 +30,22 @@ function cr(p0, p1, p2, p3, t) {
 }
 
 const _prof = { rx: 0, c: 0, rz: 0 };
+// Échelle du crâne propre à la personne scannée (1 = tête générique). Ne touche que le crâne,
+// pas le bas du visage ni le cou.
+let SKULL = 1;
+export function setSkullScale(k) { SKULL = Math.min(1.2, Math.max(0.85, k || 1)); }
+export function getSkullScale() { return SKULL; }
 /** Section horizontale de la tête à la hauteur y : ellipse (rx, rz) centrée en z = c. */
 export function headProfile(y, out = _prof) {
+  baseProfile(y, out);
+  if (SKULL !== 1) {
+    const t = Math.min(1, Math.max(0, (y + 6) / 6));
+    const k = 1 + (SKULL - 1) * t * t * (3 - 2 * t);
+    out.rx *= k; out.rz *= k;
+  }
+  return out;
+}
+function baseProfile(y, out) {
   if (y > 8.3) {
     // dôme crânien analytique
     const k = Math.min(1, (y - 8.3) / (HEAD_TOP - 8.3));
@@ -104,7 +118,7 @@ export function insideHead(p) {
 }
 
 /** Repousse un point hors de la tête, du cou, de la cape et du visage. */
-const HC = new THREE.Vector3(0, 2.6, -4.9);
+export const HC = new THREE.Vector3(0, 2.6, -4.9);
 const _d = new THREE.Vector3(), _q = new THREE.Vector3(), _od = new THREE.Vector3(), _oq = new THREE.Vector3();
 function insideOffset(p, m) {
   _od.subVectors(p, HC); const L = _od.length();
@@ -246,9 +260,8 @@ function sampleField(F, x, y) {
 const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 
 /** Construit la géométrie tête + cou fusionnée avec le visage. */
-export function buildHeadGeometry(verts, uvs) {
+export function buildHeadGeometry(verts, uvs, { NT = 240, NY = 260 } = {}) {
   const F = rasterFace(verts, uvs);
-  const NT = 240, NY = 260;
   const pos = new Float32Array((NT + 1) * (NY + 1) * 3);
   const uv = new Float32Array((NT + 1) * (NY + 1) * 2);
   const face = new Float32Array((NT + 1) * (NY + 1));

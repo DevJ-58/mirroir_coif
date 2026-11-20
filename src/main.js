@@ -3,9 +3,10 @@ import gsap from 'gsap';
 import { Stage } from './three/stage.js';
 import { Avatar } from './three/avatar.js';
 import { HairManager } from './three/hair.js';
-import { alignLandmarks } from './three/head.js';
 import { STYLES, CATEGORIES, COLORS } from './data/catalog.js';
-import { runVideoScan, scanImage, sampleSkin, loadLandmarker } from './scan/scanner.js';
+import { runVideoScan, scanImages, loadLandmarker } from './scan/scanner.js';
+import { reconstruct, preloadSegmenter } from './scan/reconstruct.js';
+import { ADAPTIVE } from './three/hairStyles.js';
 import { initCursor, initMagnetic, setCursor } from './ui/cursor.js';
 import { createSite, curtain, prepDraw } from './site/site.js';
 import { initExtras } from './studio/extras.js';
@@ -23,6 +24,7 @@ const stage = new Stage($('#gl'));
 const avatar = new Avatar();
 stage.root.add(avatar.group);
 const hair = new HairManager(avatar.group);
+hair.onChange = (id) => avatar.showCurrentHair(!id);
 
 const state = {
   screen: 'loader',
@@ -156,6 +158,7 @@ async function backgroundBuild() {
     compileStyle(s);
   }
   loadLandmarker().catch(() => {}); // préchargement silencieux du scanner
+  preloadSegmenter();
   await idle();
   await renderThumbs();
 }
@@ -235,6 +238,7 @@ async function enterScan() {
       onProgress: setRing,
       onStatus: (t) => { $('#scanStatus').textContent = t; },
       onFlash: () => gsap.fromTo('#flash', { opacity: 0.85 }, { opacity: 0, duration: 0.9, ease: 'power2.out' }),
+      onShot: (i) => { const d = $$('#scanSteps i')[i]; if (d) gsap.fromTo(d, { scaleY: 3 }, { scaleY: 1, duration: 0.6, ease: 'expo.out' }); },
     }, ac.signal);
     if (ac.signal.aborted) return;
     await processCapture(result);
@@ -243,34 +247,34 @@ async function enterScan() {
     console.warn(err);
     $('#scanIdle').style.display = 'none';
     swapText($('#scanTitle'), 'Caméra indisponible');
-    $('#scanHint').textContent = 'Autorisez la caméra dans le navigateur, ou importez une photo de face bien éclairée.';
+    $('#scanHint').textContent = 'Autorisez la caméra dans le navigateur, ou importez jusqu’à cinq photos : face, trois-quarts et profils.';
   }
 }
 function stopScan() { state.scanAbort?.abort(); state.scanAbort = null; const v = $('#video'); v.srcObject?.getTracks?.().forEach((t) => t.stop()); v.srcObject = null; }
 
 $('#photoInput').addEventListener('change', async (e) => {
-  const f = e.target.files?.[0]; e.target.value = '';
-  if (!f) return;
+  const files = [...(e.target.files || [])].slice(0, 5); e.target.value = '';
+  if (!files.length) return;
   stopScan();
-  const img = new Image();
-  img.src = URL.createObjectURL(f);
-  await img.decode().catch(() => {});
   $('#scanIdle').style.display = '';
-  $('#scanIdle span').textContent = 'Analyse de la photo…';
+  $('#scanIdle span').textContent = files.length > 1 ? `Analyse des ${files.length} photos…` : 'Analyse de la photo…';
   try {
-    const res = await scanImage(img);
+    const imgs = [];
+    for (const f of files) { const img = new Image(); img.src = URL.createObjectURL(f); await img.decode().catch(() => {}); imgs.push(img); }
+    const shots = await scanImages(imgs);
     setRing(1);
-    await processCapture(res);
+    await processCapture(shots);
   } catch (err) {
     console.warn(err);
     $('#scanIdle').style.display = 'none';
     swapText($('#scanTitle'), 'Visage introuvable');
-    $('#scanHint').textContent = 'Essayez une photo de face, visage dégagé et bien éclairé.';
+    $('#scanHint').textContent = 'Essayez des photos nettes, visage et cheveux dégagés, bien éclairées.';
   }
 });
 
 // ---------- génération de l'avatar ----------
-async function processCapture({ landmarks, canvas, width, height }) {
+async function processCapture(shots) {
+  if (!Array.isArray(shots)) shots = [shots];
   stopScan();
   await gsap.to('.scan__stage, .scan__copy, .scan__actions', { opacity: 0, scale: 0.96, duration: 0.6, ease: 'power2.in' });
   gsap.set('.scan__stage, .scan__copy, .scan__actions', { clearProps: 'all' });
@@ -286,28 +290,22 @@ async function processCapture({ landmarks, canvas, width, height }) {
   const pct = { v: 0 };
   const pctTween = (to, d) => gsap.to(pct, { v: to, duration: d, ease: 'power1.inOut', onUpdate: () => ($('#genPct').textContent = Math.round(pct.v)) });
 
-  // 1. repères → espace canonique
-  items[0].classList.add('on'); pctTween(25, 0.9);
-  const verts = alignLandmarks(landmarks, width, height);
-  const uvs = new Float32Array(468 * 2);
-  for (let i = 0; i < 468; i++) { uvs[i * 2] = landmarks[i].x; uvs[i * 2 + 1] = 1 - landmarks[i].y; }
-  const cloud = makeCloud(verts);
+  // 1→3. reconstruction de la tête à partir des prises
+  const setStep = (i) => {
+    items.forEach((l, k) => l.classList.toggle('on', k <= i));
+    pctTween([12, 35, 62, 82][i] ?? 90, 0.8);
+  };
+  setStep(0);
+  await wait(200);
+  const scan = await reconstruct(shots, setStep);
+  const cloud = makeCloud(scan.verts);
   avatar.uniforms.uReveal.value = 0.0;
-  await wait(900);
-
-  // 2. volume
-  items[1].classList.add('on'); pctTween(55, 1.0);
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 8;
-  const [r, g, b] = sampleSkin(canvas, landmarks);
-  const skin = new THREE.Color().setRGB(r, g, b, THREE.SRGBColorSpace);
-  avatar.setScan({ verts, uvs, texture: tex, skin });
+  avatar.setScan(scan);
   state.scanned = true;
-  await wait(400);
-
-  // 3. texture + révélation
-  items[2].classList.add('on'); pctTween(85, 1.6);
+  state.hairInfo = scan.hair;
+  // coiffures reconstruites sur le crâne de la personne, adaptées à son volume
+  hair.setContext({ scanned: true, volume: scan.hair.volume, length: scan.hair.length });
+  pctTween(88, 1.2);
   gsap.to(avatar.uniforms.uReveal, { value: 1, duration: 2.2, ease: 'power2.inOut' });
   gsap.to(cloud.material, { opacity: 0, duration: 1.6, delay: 0.8, onComplete: () => { cloud.parent.remove(cloud); cloud.geometry.dispose(); } });
   await wait(2300);
@@ -370,7 +368,7 @@ function toast(text) {
 }
 
 const panelCtl = initPanel({ STYLES });
-const extras = initExtras({ stage, hair, state, STYLES, select: (s, f) => select(s, f), toast, onReset: () => resetSession() });
+const extras = initExtras({ stage, hair, state, STYLES, avatar, select: (s, f) => select(s, f), toast, onReset: () => resetSession() });
 
 /** Fin de séance (mode borne) : on efface le scan et on revient au début du site. */
 function resetSession() {
@@ -379,7 +377,7 @@ function resetSession() {
   extras.setCompare(false);
   extras.clearFavs();
   stopScan();
-  if (state.scanned) { avatar.setMannequin(); avatar.scan = null; state.scanned = false; renderThumbs(); }
+  if (state.scanned) { avatar.setMannequin(); state.scanned = false; hair.setContext(null); renderThumbs(); }
   state.selected = STYLES[0];
   curtain(async () => {
     stage.controls.enabled = false; stage.controls.autoRotate = false;
@@ -405,7 +403,9 @@ async function renderThumbs() {
     for (const [x] of saved) x.group.visible = false;
     h.group.visible = true; h.common.uGrow.value = 1; h.group.position.y = 0; h.group.scale.setScalar(1);
     stage.root.rotation.set(0, 0, 0); stage.root.position.y = -1.5; avatar.uniforms.uReveal.value = 1;
+    const ch = avatar.currentHair, chv = ch?.visible; if (ch) ch.visible = false;
     thumbs[s.id] = stage.renderThumb(cam, 280);
+    if (ch) ch.visible = chv;
     for (const [x, v, g, y, sc] of saved) { x.group.visible = v; x.common.uGrow.value = g; x.group.position.y = y; x.group.scale.setScalar(sc); }
     stage.root.rotation.copy(rot); stage.root.position.y = py; avatar.uniforms.uReveal.value = rev;
     });
@@ -459,6 +459,9 @@ function updateDetails(s) {
   gsap.fromTo($$('.w', nameEl), { yPercent: 105 }, { yPercent: 0, duration: 1, ease: 'expo.out', stagger: 0.06 });
   swapText($('#dDesc'), s.desc);
   $('#dDur').textContent = s.duration;
+  const adapt = state.scanned && ADAPTIVE.has(s.kind) && state.hairInfo;
+  $('#dAdapt').hidden = !adapt;
+  if (adapt) $('#dAdapt').textContent = `Ajusté à vos cheveux : ${state.hairInfo.volume.toFixed(1)} cm de volume, ${Math.round(state.hairInfo.length)} cm de longueur`;
   $('#dPrice').textContent = s.price;
 }
 
@@ -620,7 +623,7 @@ document.addEventListener('click', async (e) => {
       const go = () => {
         stopScan();
         if (state.screen === 'site') leaveSite();
-        if (state.scanned) { avatar.setMannequin(); avatar.scan = null; state.scanned = false; renderThumbs(); }
+        if (state.scanned) { avatar.setMannequin(); state.scanned = false; hair.setContext(null); renderThumbs(); }
         enterStudio();
       };
       if (state.screen === 'site') curtain(async () => go()); else go();
@@ -693,7 +696,7 @@ boot();
 
 // accès debug
 window.__miroir = {
-  stage, avatar, hair, state, STYLES, select, processCapture, site,
+  stage, avatar, hair, state, STYLES, select, processCapture, site, reconstruct,
   view(id, theta = 0.5, phi = 1.4, radius = 95) {
     stage.controls.enabled = false; stage.shift(0, 0, 0.01);
     $$('.screen').forEach((s) => (s.style.opacity = 0));

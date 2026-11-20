@@ -5,15 +5,16 @@ import gsap from 'gsap';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 
-export function initExtras({ stage, hair, state, STYLES, select, toast, onReset }) {
+export function initExtras({ stage, hair, state, STYLES, select, toast, onReset, avatar }) {
   // ================= comparateur avant / après =================
   const split = $('#split'), line = $('#splitLine'), handle = $('#splitHandle');
   const sp = { x: 0 };
   let hidden = null;
   stage.split = {
     get x() { return state.compare ? sp.x : 0; },
-    hide() { hidden = hair.current ? hair.cache.get(hair.current) : null; if (hidden) hidden.group.visible = false; },
-    show() { if (hidden) hidden.group.visible = true; hidden = null; },
+    // « Avant » : la coiffure disparaît et les cheveux réels du scan réapparaissent
+    hide() { hidden = hair.current ? hair.cache.get(hair.current) : null; if (hidden) hidden.group.visible = false; avatar?.showCurrentHair(true); },
+    show() { if (hidden) hidden.group.visible = true; hidden = null; avatar?.showCurrentHair(!hair.current); },
   };
   const placeLine = () => { line.style.transform = `translateX(${sp.x * window.innerWidth}px)`; };
   gsap.ticker.add(() => { if (state.compare) placeLine(); });
@@ -106,7 +107,9 @@ export function initExtras({ stage, hair, state, STYLES, select, toast, onReset 
     for (const [x] of saved) x.group.visible = false;
     h.group.visible = true; h.common.uGrow.value = 1; h.group.position.y = 0; h.group.scale.setScalar(1);
     stage.root.rotation.set(0, 0, 0);
+    const ch = avatar?.currentHair, chv = ch?.visible; if (ch) ch.visible = false;
     const url = stage.renderThumb(favCam, 420);
+    if (ch) ch.visible = chv;
     for (const [x, v, g, y, sc] of saved) { x.group.visible = v; x.common.uGrow.value = g; x.group.position.y = y; x.group.scale.setScalar(sc); }
     stage.root.rotation.copy(rot);
     return url;

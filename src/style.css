@@ -204,6 +204,8 @@ svg { display: block; }
 .details__index span:first-child { color: var(--gold); }
 .details__name { margin: 0; font-family: var(--serif); font-weight: 400; font-size: clamp(40px, 4.2vw, 68px); line-height: 0.95; overflow: hidden; }
 .details__name .w { display: inline-block; }
+.details__adapt { margin: -10px 0 20px; font-size: 12px; letter-spacing: 0.04em; color: var(--gold); }
+.details__adapt::before { content: '◆ '; font-size: 9px; vertical-align: 1px; }
 .details__desc { margin: 16px 0 22px; font-size: 14px; line-height: 1.65; color: var(--ivory-2); min-height: 3.3em; }
 .details__meta { display: grid; grid-template-columns: repeat(3, auto); gap: 26px; justify-content: start; padding: 16px 0 22px; border-top: 1px solid var(--line); margin-bottom: 4px; }
 .details__meta span { display: block; font-size: 10px; letter-spacing: 0.24em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }

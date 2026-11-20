@@ -214,7 +214,7 @@ const builders = {
     const roots = scalpRoots({ spacing: 2.5, rand, inset: 0.6 });
     const strands = roots.map((r) => ({
       pts: growStrand(r.p.clone().addScaledVector(r.n, 0.3), outwardBack(r, 0.6, 0.5, 0.35), {
-        length: 30 + rand() * 9, segs: 28, gravity: 0.17, margin: 0.9, rand, wobble: 0.1, hug: 0.08,
+        length: lockLen() * (1 + rand() * 0.3), segs: 28, gravity: 0.17, margin: 0.9, rand, wobble: 0.1, hug: 0.08,
       }),
       radius: 0.6 + rand() * 0.15, rand: rand(),
     }));
@@ -229,7 +229,7 @@ const builders = {
     const roots = scalpRoots({ spacing: 1.85, rand, inset: 0.4 });
     const strands = roots.map((r) => ({
       pts: growStrand(r.p.clone().addScaledVector(r.n, 0.25), outwardBack(r, 0.45, 0.6, 0.3), {
-        length: 20 + rand() * 4, segs: 24, gravity: 0.17, margin: 0.8, rand, wobble: 0.05, hug: 0.05,
+        length: twistLen() * (1 + rand() * 0.2), segs: 24, gravity: 0.17, margin: 0.8, rand, wobble: 0.05, hug: 0.05,
       }),
       radius: 0.42, rand: rand(),
     }));
@@ -293,7 +293,7 @@ const builders = {
       const m = smooth(hl - 0.3, hl + 0.6, P.y);
       const grow = Math.sqrt(smooth(hl - 0.6, hl + 5.5 + 1.5 * frontness, P.y));
       const n = vnoise(u.x * 3.2 + 10, u.y * 3.2, u.z * 3.2) * 0.6 + vnoise(u.x * 8, u.y * 8 + 5, u.z * 8) * 0.4;
-      const R = 15.2 * (0.93 + 0.14 * n) * (1 + 0.06 * u.y);
+      const R = afroRadius() * (0.93 + 0.14 * n) * (1 + 0.06 * u.y);
       const r = d + 0.25 + Math.max(0, R - d) * grow;
       P.copy(C).addScaledVector(u, r);
       pos.setXYZ(i, P.x, P.y, P.z);
@@ -354,11 +354,11 @@ const builders = {
     for (let s = 0; s <= 120; s++) {
       const t = s / 120;
       const a = t * Math.PI * 2 * turns;
-      const rr = 3.4 * (1 - 0.62 * t);
+      const rr = 3.4 * bunScale() * (1 - 0.62 * t);
       const h = Math.sin(t * Math.PI) * 1.6 + t * 1.4;
       pts.push(bunC.clone().addScaledVector(U, Math.cos(a) * rr).addScaledVector(V, Math.sin(a) * rr).addScaledVector(W, h));
     }
-    const tube = buildTubes([{ pts, radius: 1.55, rand: 0.4 }], { samples: 240, radial: 18, lobes: 2, lobeAmp: 0.22, twist: 0.9, taper: 0.6, rootTaper: 0.4 });
+    const tube = buildTubes([{ pts, radius: 1.55 * Math.sqrt(bunScale()), rand: 0.4 }], { samples: 240, radial: 18, lobes: 2, lobeAmp: 0.22, twist: 0.9, taper: 0.6, rootTaper: 0.4 });
     const m = makeStrandMaterial(common); m.uniforms.uShine.value = 90; m.uniforms.uStriation.value = 60; m.uniforms.uLobeShade.value = 0.25;
     return [baseMesh, new THREE.Mesh(tube, m)];
   },
@@ -401,7 +401,20 @@ function straightHair(common, seed, { length, spacing, cut }) {
 }
 
 /** Construit une coiffure : renvoie { group, common } */
-export function buildHairstyle(kind, color = '#14100e') {
+// ---------- adaptation au volume réel des cheveux (scan multi-vues) ----------
+// volume : épaisseur des cheveux sur le dessus (cm) ; length : longueur estimée (cm).
+const DEFAULT_CTX = { scanned: false, volume: 5, length: 26 };
+let CTX = DEFAULT_CTX;
+const clampN = (x, a, b) => Math.min(b, Math.max(a, x));
+const lockLen = () => (CTX.scanned ? clampN(CTX.length, 8, 42) : 30);          // locks : les cheveux de la personne
+const twistLen = () => (CTX.scanned ? clampN(CTX.length * 0.75, 6, 30) : 20);  // vanilles : rétrécissent
+const afroRadius = () => (CTX.scanned ? 15.2 + (clampN(CTX.volume, 2, 10) - 5) * 0.95 : 15.2);
+const bunScale = () => (CTX.scanned ? clampN(Math.sqrt(CTX.volume * CTX.length) / 11, 0.7, 1.4) : 1);
+/** Styles qui dépendent des cheveux réels (les autres utilisent des rajouts ou une coupe). */
+export const ADAPTIVE = new Set(['afro', 'locks', 'twists', 'bun']);
+
+export function buildHairstyle(kind, color = '#14100e', ctx = null) {
+  CTX = ctx ? { ...DEFAULT_CTX, ...ctx } : DEFAULT_CTX;
   const common = {
     uColor: { value: new THREE.Color(color) },
     uTip: { value: new THREE.Color(color) },

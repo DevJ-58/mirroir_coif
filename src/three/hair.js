@@ -10,11 +10,25 @@ export class HairManager {
     this.current = null; // id affiché
     this.color = new THREE.Color('#15100d');
     this.tip = new THREE.Color('#15100d');
+    this.ctx = null;       // volume réel des cheveux (scan) : adapte certains styles
+    this.onChange = null;  // appelé quand la coiffure affichée change (id ou null)
+  }
+
+  /** Nouveau contexte (scan) : les coiffures sont reconstruites à la demande. */
+  setContext(ctx) {
+    this.ctx = ctx;
+    for (const h of this.cache.values()) {
+      this.parent.remove(h.group);
+      h.group.traverse((o) => { if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); } });
+    }
+    this.cache.clear();
+    this.current = null;
+    this.onChange?.(null);
   }
 
   get(style) {
     if (!this.cache.has(style.id)) {
-      const h = buildHairstyle(style.kind, '#15100d');
+      const h = buildHairstyle(style.kind, '#15100d', this.ctx);
       h.group.visible = false;
       h.common.uGrow.value = 0;
       this.parent.add(h.group);
@@ -32,6 +46,7 @@ export class HairManager {
     const prev = this.current ? this.cache.get(this.current) : null;
     if (prev) this._hide(prev, mode === 'instant' ? 0 : 0.45);
     this.current = style ? style.id : null;
+    this.onChange?.(this.current);
     if (!style) return;
     const h = this.get(style);
     gsap.killTweensOf(h.common.uGrow);
@@ -68,6 +83,7 @@ export class HairManager {
     if (!this.current) return;
     this._hide(this.cache.get(this.current), d);
     this.current = null;
+    this.onChange?.(null);
   }
 
   setColor(hex, tipHex) {
