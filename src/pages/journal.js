@@ -94,13 +94,13 @@ export const journal = {
   `,
   mount(root, { hair, STYLES }) {
     reveals(root);
-    const byId = (id) => STYLES.find((s) => s.id === id) || STYLES[[...String(id)].reduce((a, c) => a + c.charCodeAt(0), 0) % STYLES.length];
-    hair.show(byId('bun'));
+    const byId = (id) => STYLES.find((s) => s.id === id);
+    hair.show(byId('bun'), 'drop');
     // survol d'un article : le mannequin porte sa coiffure
     $('.jr__list', root).addEventListener('pointerover', (e) => {
       const a = e.target.closest('.jr__item'); if (!a) return;
       const s = byId(ARTICLES[+a.dataset.i].style);
-      if (hair.current !== s.id) hair.show(s);
+      if (hair.current !== s.id) hair.show(s, 'drop');
     });
     const st = {
       list: ScrollTrigger.create({ trigger: '.jr', start: 'top 80%', end: 'top 10%' }),
@@ -143,7 +143,7 @@ export const article = {
   mount(root, { hair, STYLES }, { slug }) {
     reveals(root);
     const a = ARTICLES.find((x) => x.slug === slug);
-    hair.show(((id) => STYLES.find((s) => s.id === id) || STYLES[[...String(id)].reduce((a, c) => a + c.charCodeAt(0), 0) % STYLES.length])(a.style));
+    hair.show(STYLES.find((s) => s.id === a.style), 'drop');
     const st = {
       body: ScrollTrigger.create({ trigger: '.ar__body', start: 'top 70%', end: 'top 10%' }),
       foot: ScrollTrigger.create({ trigger: '.pg-foot', start: 'top bottom', end: 'top 30%' }),

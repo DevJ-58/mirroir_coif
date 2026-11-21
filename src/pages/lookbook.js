@@ -60,8 +60,7 @@ export default {
   `,
   mount(root, { hair, STYLES, onTry }) {
     reveals(root);
-    const D = () => STYLES.slice();
-    let list = D();
+    let list = STYLES.slice();
     let idx = -1;
     const show = $('#lbShow', root), name = $('#lbName', root), big = $('#lbBig', root), rail = $('#lbRail', root);
     const inst = { spin: 0 };
@@ -91,7 +90,7 @@ export default {
       $('#lbPrice', root).textContent = s.price;
       big.textContent = pad2(i + 1);
       gsap.fromTo(big, { opacity: 0, scale: 0.92 }, { opacity: 1, scale: 1, duration: 1.2, ease: 'expo.out' });
-      if (active === 'show') hair.show(s);
+      if (active === 'show') hair.show(s, 'drop');
     }
     buildRail();
 
@@ -116,14 +115,14 @@ export default {
     const zone = (key) => {
       if (active === key) return;
       active = key;
-      if (key === 'hero') hair.show(((id) => STYLES.find((s) => s.id === id) || STYLES[[...String(id)].reduce((a, c) => a + c.charCodeAt(0), 0) % STYLES.length])('box-braids'));
+      if (key === 'hero') hair.show(STYLES.find((s) => s.id === 'box-braids'), 'drop');
       if (key === 'show') setIdx(Math.max(0, idx), true);
       if (key === 'index') { inst.spin = 0; }
     };
     ScrollTrigger.create({ trigger: show, start: 'top 50%', end: 'bottom 50%', onToggle: (s) => s.isActive && zone('show') });
     ScrollTrigger.create({ trigger: '#lbIndex', start: 'top 50%', end: 'bottom 50%', onToggle: (s) => s.isActive && zone('index') });
     ScrollTrigger.create({ trigger: root, start: 'top top', end: () => `+=${window.innerHeight * 0.5}`, onToggle: (s) => s.isActive && zone('hero') });
-    hair.show(((id) => STYLES.find((s) => s.id === id) || STYLES[[...String(id)].reduce((a, c) => a + c.charCodeAt(0), 0) % STYLES.length])('box-braids'));
+    hair.show(STYLES.find((s) => s.id === 'box-braids'), 'drop');
     setIdx(0, true);
 
     // filtres : la piste se recompose
@@ -131,7 +130,7 @@ export default {
       const b = e.target.closest('.chip'); if (!b) return;
       $$('.chip', root).forEach((c) => c.classList.toggle('is-on', c === b));
       const cat = b.dataset.cat;
-      list = cat === 'all' ? D() : D().filter((s) => s.cat === cat);
+      list = cat === 'all' ? STYLES.slice() : STYLES.filter((s) => s.cat === cat);
       buildRail();
       ScrollTrigger.refresh();
       window.__garoLenis?.scrollTo(show, { duration: 0.9 });
@@ -151,7 +150,7 @@ export default {
     const pick = (card) => {
       const s = STYLES.find((x) => x.id === card.dataset.id);
       $$('.lb-card', grid).forEach((c) => c.classList.toggle('is-on', c === card));
-      if (hair.current !== s.id) hair.show(s);
+      if (hair.current !== s.id) hair.show(s, 'drop');
       label.textContent = s.name;
     };
     grid.addEventListener('pointerover', (e) => { const c = e.target.closest('.lb-card'); if (c && active === 'index' && e.pointerType === 'mouse') pick(c); });

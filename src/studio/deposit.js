@@ -2,17 +2,16 @@
 // fiche (nom, catégorie, durée, tarif), sauvegarde sur l'appareil.
 import gsap from 'gsap';
 import { registerGlb, forgetGlb, saveStyle, deleteStyle, loadStyles } from '../three/glbHair.js';
-import { forgetViews } from '../photo/stage.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const MAX = 40 * 1024 * 1024;   // 40 Mo
 
-export function initDeposit({ STYLES, CATEGORIES, hair, state, select, refreshCollection, toast, openAtelier }) {
+export function initDeposit({ STYLES, CATEGORIES, hair, state, select, refreshCollection, toast }) {
   const dlg = $('#dep'), form = $('#depForm'), info = $('#depInfo'), err = $('#depErr');
   $('#depCat').innerHTML = CATEGORIES.filter((c) => c.id !== 'all').map((c) => `<option value="${c.id}">${c.label}</option>`).join('');
   let pending = null;   // { id, data, prev }
 
-  const toStyle = (r) => ({ id: r.id, kind: r.type === 'photo' ? 'photo' : 'glb', views: r.views, name: r.name, cat: r.cat, duration: r.duration || '—', price: r.price || '—', desc: r.desc || 'Coiffure déposée par le salon.', custom: true });
+  const toStyle = (r) => ({ id: r.id, kind: 'glb', name: r.name, cat: r.cat, duration: r.duration || '—', price: r.price || '—', desc: r.desc || 'Coiffure déposée par le salon.', custom: true });
 
   async function open(file) {
     if (!file) return;
@@ -71,7 +70,7 @@ export function initDeposit({ STYLES, CATEGORIES, hair, state, select, refreshCo
 
   document.addEventListener('click', (e) => {
     const a = e.target.closest('[data-action]'); if (!a) return;
-    if (a.dataset.action === 'add-style') openAtelier?.();
+    if (a.dataset.action === 'add-style') $('#glbInput').click();
     if (a.dataset.action === 'dep-cancel') cancel();
     if (a.dataset.action === 'remove-style') remove(state.selected);
   });
@@ -95,7 +94,7 @@ export function initDeposit({ STYLES, CATEGORIES, hair, state, select, refreshCo
     if (!style?.custom) return;
     if (!window.confirm(`Retirer « ${style.name} » de la collection de cet appareil ?`)) return;
     await deleteStyle(style.id).catch(() => {});
-    hair.drop(style.id); forgetGlb(style.id); forgetViews(style.id);
+    hair.drop(style.id); forgetGlb(style.id);
     const i = STYLES.indexOf(style); if (i >= 0) STYLES.splice(i, 1);
     await refreshCollection();
     select(STYLES[0], true);
@@ -108,32 +107,9 @@ export function initDeposit({ STYLES, CATEGORIES, hair, state, select, refreshCo
       const recs = (await loadStyles()).sort((a, b) => (a.added || 0) - (b.added || 0));
       let n = 0;
       for (const r of recs) {
-        // seules les coiffures-photos sont reprises (les anciens fichiers 3D ne sont plus affichés)
-        if (r.type !== 'photo') continue;
-        STYLES.push(toStyle(r)); n++;
+        try { await registerGlb(r.id, r.data); STYLES.push(toStyle(r)); n++; } catch (e) { console.warn('coiffure illisible', r.name, e); }
       }
       return n;
-    },
-    /** Publication depuis l'atelier artiste : { name, cat, duration, price, desc, data: ArrayBuffer }. Renvoie le style. */
-    async publish(fields) {
-      const id = 'glb-' + Date.now().toString(36);
-      await registerGlb(id, fields.data);
-      const rec = { id, name: fields.name, cat: fields.cat, duration: fields.duration || '', price: fields.price || '', desc: fields.desc || '', data: fields.data, added: Date.now(), source: 'atelier' };
-      await saveStyle(rec);
-      const style = toStyle(rec);
-      STYLES.push(style);
-      await refreshCollection();
-      return style;
-    },
-    /** Publication d'une coiffure-photo : { name, cat, duration, price, desc, views: [{ kind, mime, data, face }] }. */
-    async publishPhoto(fields) {
-      const id = 'photo-' + Date.now().toString(36);
-      const rec = { id, type: 'photo', name: fields.name, cat: fields.cat, duration: fields.duration || '', price: fields.price || '', desc: fields.desc || '', views: fields.views, added: Date.now() };
-      await saveStyle(rec);
-      const style = toStyle(rec);
-      STYLES.push(style);
-      await refreshCollection();
-      return style;
     },
     /** Le bouton « retirer » n'apparaît que pour une coiffure déposée. */
     onSelect(style) { const b = $('.details__remove'); if (b) b.hidden = !style?.custom; },

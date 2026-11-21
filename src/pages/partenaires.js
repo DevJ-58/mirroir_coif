@@ -73,7 +73,7 @@ export default {
   `,
   mount(root, { hair, STYLES, onTry }) {
     reveals(root);
-    const byId = (id) => STYLES.find((s) => s.id === id) || STYLES[[...String(id)].reduce((a, c) => a + c.charCodeAt(0), 0) % STYLES.length];
+    const byId = (id) => STYLES.find((s) => s.id === id);
     let cur = -1, inMap = false;
     const pins = $$('.pt__pin-g', root), items = $$('#ptList li', root);
     function pick(i) {
@@ -88,14 +88,14 @@ export default {
       $('#ptHours', root).textContent = s.hours;
       $('#ptStyles', root).innerHTML = s.styles.map((id) => `<li data-id="${id}">${esc(byId(id).name)}</li>`).join('');
       gsap.fromTo($('#ptCard', root).children, { y: 18, opacity: 0 }, { y: 0, opacity: 1, duration: 0.8, ease: 'expo.out', stagger: 0.05 });
-      if (inMap) hair.show(byId(s.styles[0]));
+      if (inMap) hair.show(byId(s.styles[0]), 'drop');
     }
     pins.forEach((p) => {
       p.addEventListener('click', () => pick(+p.dataset.i));
       p.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(+p.dataset.i); } });
     });
     items.forEach((p) => p.addEventListener('click', () => pick(+p.dataset.i)));
-    $('#ptStyles', root).addEventListener('click', (e) => { const li = e.target.closest('li'); if (li) hair.show(byId(li.dataset.id)); });
+    $('#ptStyles', root).addEventListener('click', (e) => { const li = e.target.closest('li'); if (li) hair.show(byId(li.dataset.id), 'drop'); });
     $('#ptTry', root).addEventListener('click', () => onTry(SALONS[cur].styles[0]));
     // les communes et les épingles apparaissent
     gsap.fromTo($$('.pt__commune, .pt__pin-g', root), { opacity: 0 }, { opacity: 1, duration: 1, stagger: 0.04, scrollTrigger: { trigger: '#ptMap', start: 'top 70%' } });
@@ -108,7 +108,7 @@ export default {
       foot: ScrollTrigger.create({ trigger: '.pg-foot', start: 'top bottom', end: 'top 30%' }),
     };
     pick(0);
-    hair.show(byId('box-braids'));
+    hair.show(byId('box-braids'), 'drop');
     const PH = (s) => P({ x: s ? 0 : 0.25, y: s ? 0.12 : 0.03, theta: 0.4, r: s ? 128 : 100, sway: 1 });
     const PM = (s) => P({ x: s ? 0 : 0.34, y: s ? -0.3 : -0.12, theta: -0.3, phi: 1.48, r: s ? 190 : 175, sway: 0.4 });
     const PJ = (s) => P({ x: s ? 0 : 0.26, y: s ? 0.3 : 0.03, theta: -0.5, r: s ? 140 : 104, sway: 1 });

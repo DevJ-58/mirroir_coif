@@ -324,10 +324,3 @@ body, .topbar__step, .topbar__close, .seg, .toolbar { transition: background-col
 .theme-toggle .i-sun { transform: translateY(140%) rotate(-90deg); opacity: 0; }
 :root[data-theme="light"] .theme-toggle .i-sun { transform: none; opacity: 1; }
 :root[data-theme="light"] .theme-toggle .i-moon { transform: translateY(-140%) rotate(90deg); opacity: 0; }
-
-/* ---------- mannequin-photo (remplace le rendu 3D) ---------- */
-#gl { opacity: 0 !important; }
-.pavatar { position: fixed; inset: 0; z-index: 2; pointer-events: none; overflow: hidden; }
-.pavatar__fig { position: absolute; left: 0; top: 0; width: 0; height: 0; will-change: transform; }
-.pavatar__layer, .pavatar__before { position: absolute; left: 0; top: 0; transform-origin: 50% 45%; will-change: transform, opacity; }
-.pavatar__before { display: none; z-index: 3 !important; }

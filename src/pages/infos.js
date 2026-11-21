@@ -37,7 +37,7 @@ export const apropos = {
   `,
   mount(root, { hair, STYLES }) {
     reveals(root);
-    hair.show(((id) => STYLES.find((s) => s.id === id) || STYLES[[...String(id)].reduce((a, c) => a + c.charCodeAt(0), 0) % STYLES.length])('waves'));
+    hair.show(STYLES.find((s) => s.id === 'waves'), 'drop');
     const man = $('#abMan', root);
     man.innerHTML = man.textContent.split(/\s+/).map((w) => `<span class="mw">${w}</span>`).join(' ');
     gsap.to($$('.mw', man), { opacity: 1, stagger: 0.12, ease: 'none', scrollTrigger: { trigger: man, start: 'top 75%', end: 'bottom 55%', scrub: 1 } });
@@ -90,7 +90,7 @@ export const faq = {
   `,
   mount(root, { hair, STYLES }) {
     reveals(root);
-    hair.show(((id) => STYLES.find((s) => s.id === id) || STYLES[[...String(id)].reduce((a, c) => a + c.charCodeAt(0), 0) % STYLES.length])('fade'));
+    hair.show(STYLES.find((s) => s.id === 'fade'), 'drop');
     // ouverture animée des réponses
     $$('.fq__item', root).forEach((d) => {
       const s = $('summary', d), a = $('.fq__a', d);
@@ -141,7 +141,7 @@ export const contact = {
   `,
   mount(root, { hair, STYLES }) {
     reveals(root);
-    hair.show(((id) => STYLES.find((s) => s.id === id) || STYLES[[...String(id)].reduce((a, c) => a + c.charCodeAt(0), 0) % STYLES.length])('twists'));
+    hair.show(STYLES.find((s) => s.id === 'twists'), 'drop');
     let who = 'salon';
     const form = $('#ctForm', root);
     $('.ct__seg', root).addEventListener('click', (e) => {

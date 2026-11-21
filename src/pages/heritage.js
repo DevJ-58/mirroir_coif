@@ -56,7 +56,7 @@ export default {
   `,
   mount(root, { hair, STYLES }) {
     reveals(root);
-    const byId = (id) => STYLES.find((s) => s.id === id) || STYLES[[...String(id)].reduce((a, c) => a + c.charCodeAt(0), 0) % STYLES.length];
+    const byId = (id) => STYLES.find((s) => s.id === id);
     const row = $('#hgRow', root), eras = $$('.hg-era', root), dots = $$('.hg-dot', root);
     let i0 = -1, inTrack = false;
     const inst = { spin: 0 };
@@ -65,7 +65,7 @@ export default {
       i0 = i;
       eras.forEach((e, k) => e.classList.toggle('is-on', k === i));
       dots.forEach((d, k) => d.classList.toggle('is-on', k <= i));
-      if (inTrack) hair.show(byId(ERAS[i].style));
+      if (inTrack) hair.show(byId(ERAS[i].style), 'drop');
     };
     const track = $('#hgTrack', root);
     const st = {
@@ -94,7 +94,7 @@ export default {
       foot: ScrollTrigger.create({ trigger: '.pg-foot', start: 'top bottom', end: 'top 30%' }),
     };
     setEra(0);
-    hair.show(byId('cornrows'));
+    hair.show(byId('cornrows'), 'drop');
     dots.forEach((d) => d.addEventListener('click', () => {
       const k = +d.dataset.i;
       window.__garoLenis?.scrollTo(st.run.start + (k / (ERAS.length - 1)) * (st.run.end - st.run.start), { duration: 1.6 });
