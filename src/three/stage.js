@@ -70,11 +70,24 @@ export class Stage {
 
   /** Place la caméra en coordonnées sphériques autour de la cible. */
   orbitTo({ theta = 0, phi = 1.48, radius = 110, ty = 0, duration = 1.6, ease = 'expo.inOut' } = {}) {
-    const cur = this._spherical();
-    const o = { ...cur };
-    return gsap.to(o, {
-      theta, phi, radius, ty, duration, ease,
-      onUpdate: () => this._setSpherical(o),
+    // La position de départ est lue au moment où le mouvement commence (pas à sa création) :
+    // dans une séquence (présentation), chaque étape part de là où la précédente s'est arrêtée.
+    const p = { k: 0 };
+    let from = null;
+    const start = () => {
+      from = this._spherical();
+      // l'angle relu est ramené entre -π et π : on repart du tour le plus proche de la cible
+      while (theta - from.theta > Math.PI) from.theta += Math.PI * 2;
+      while (theta - from.theta < -Math.PI) from.theta -= Math.PI * 2;
+    };
+    const lerp = (a, b) => a + (b - a) * p.k;
+    return gsap.to(p, {
+      k: 1, duration, ease,
+      onStart: start,
+      onUpdate: () => {
+        if (!from) start();
+        this._setSpherical({ theta: lerp(from.theta, theta), phi: lerp(from.phi, phi), radius: lerp(from.radius, radius), ty: lerp(from.ty, ty) });
+      },
     });
   }
 
