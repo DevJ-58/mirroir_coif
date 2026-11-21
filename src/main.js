@@ -11,6 +11,7 @@ import { createSite, curtain, prepDraw } from './site/site.js';
 import { initExtras } from './studio/extras.js';
 import { initPanel } from './studio/panel.js';
 import { initDeposit } from './studio/deposit.js';
+import { createPhotoStage, photoThumb } from './photo/stage.js';
 import { createRouter } from './site/router.js';
 import { PAGES } from './pages/index.js';
 
@@ -45,7 +46,7 @@ const mouse = { x: 0, y: 0, sx: 0, sy: 0 };
 window.addEventListener('pointermove', (e) => { mouse.x = e.clientX / window.innerWidth - 0.5; mouse.y = e.clientY / window.innerHeight - 0.5; });
 const site = createSite({ stage, avatar, hair, STYLES, COLORS, mouse, onTry: (id) => tryStyle(id) });
 window.__garoLenis = site.lenis;
-const router = createRouter({ site, pages: PAGES, ctx: { hair, STYLES, CATEGORIES, COLORS, stage, avatar, onTry: (id) => tryStyle(id), beforeRoute: () => site.closeMenu(), thumbs: null, publish: (f) => deposit.publish(f), toast: (t) => toast(t) } });
+const router = createRouter({ site, pages: PAGES, ctx: { hair, STYLES, CATEGORIES, COLORS, stage, avatar, onTry: (id) => tryStyle(id), beforeRoute: () => site.closeMenu(), thumbs: null, publish: (f) => deposit.publish(f), publishPhoto: (f) => deposit.publishPhoto(f), client: () => (state.scanned && state.faceShots ? { shots: state.faceShots, skin: avatar.scan?.skin } : null), toast: (t) => toast(t) } });
 stage.onTick((dt, t) => {
   mouse.sx += (mouse.x - mouse.sx) * 0.05; mouse.sy += (mouse.y - mouse.sy) * 0.05;
   if (state.idle) {
@@ -175,6 +176,7 @@ function idle() {
 
 // ---------- site vitrine ----------
 function enterSite(first = false) {
+  if (photoStage.active) photoStage.hide();
   show('site');
   state.idle = false;
   if (first) { router.start(); site.intro(); } else site.enter();
@@ -309,6 +311,8 @@ async function processCapture(shots) {
   avatar.uniforms.uReveal.value = 0.0;
   avatar.setScan(scan);
   state.scanned = true;
+  state.faceShots = shots;
+  photoStage.setClient({ shots, skin: scan.skin });
   pctTween(88, 1.2);
   gsap.to(avatar.uniforms.uReveal, { value: 1, duration: 2.2, ease: 'power2.inOut' });
   gsap.to(cloud.material, { opacity: 0, duration: 1.6, delay: 0.8, onComplete: () => { cloud.parent.remove(cloud); cloud.geometry.dispose(); } });
@@ -372,6 +376,19 @@ function toast(text) {
 }
 
 const panelCtl = initPanel({ STYLES });
+// coiffures-photos : une scène photo prend la place du mannequin 3D
+const photoStage = createPhotoStage($('#photoStage'));
+function preview(st) {
+  if (st?.kind === 'photo') {
+    hair.hideAll(0.3);
+    photoStage.show(st);
+    gsap.to('#gl', { opacity: 0, duration: 0.4 });
+  } else {
+    if (photoStage.active) { photoStage.hide(); gsap.to('#gl', { opacity: 1, duration: 0.5 }); }
+    if (st) hair.show(st, 'drop');
+  }
+}
+const photoClient = () => (state.scanned && avatar.realistic && state.faceShots ? { shots: state.faceShots, skin: avatar.scan?.skin } : null);
 const deposit = initDeposit({
   STYLES, CATEGORIES, hair, state, toast,
   select: (s, force) => select(s, force),
@@ -386,7 +403,7 @@ function resetSession() {
   extras.setCompare(false);
   extras.clearFavs();
   stopScan();
-  if (state.scanned) { avatar.setMannequin(); state.scanned = false; renderThumbs(); }
+  if (state.scanned) { avatar.setMannequin(); state.scanned = false; state.faceShots = null; photoStage.setClient(null); renderThumbs(); }
   state.selected = STYLES[0];
   curtain(async () => {
     stage.controls.enabled = false; stage.controls.autoRotate = false;
@@ -404,6 +421,12 @@ async function renderThumbs() {
   cam.lookAt(0, 3, 0);
   const thumbs = {};
   for (const s of STYLES) {
+    if (s.kind === 'photo') {
+      try { thumbs[s.id] = await photoThumb(s); } catch (e) { console.warn(e); }
+      const im = $(`.card[data-id="${s.id}"] img`);
+      if (im && thumbs[s.id]) { im.src = thumbs[s.id]; im.classList.add('ready'); im.previousElementSibling?.remove(); }
+      continue;
+    }
     const h = hair.get(s);
     await stage.inFrame(() => {
     // état courant sauvegardé
@@ -444,6 +467,7 @@ function enterStudio() {
 }
 
 async function leaveStudio() {
+  photoStage.hide();
   stage.controls.enabled = false; stage.controls.autoRotate = false;
   $('[data-action="rotate"]').classList.remove('is-on');
   await gsap.to('#panel, #details, #toolbar, .studio__left, #hintDrag', { opacity: 0, y: 20, duration: 0.5, ease: 'power2.in', stagger: 0.03 });
@@ -456,7 +480,7 @@ function select(style, force = false) {
   $$('.card').forEach((c) => c.classList.toggle('is-selected', c.dataset.id === style.id));
   extras.onSelect();
   panelCtl.reveal(style.id);
-  hair.show(style, 'drop');
+  preview(style);
   setBigTitle(style.name);
   if (changed || force) updateDetails(style);
   deposit.onSelect(style);
@@ -481,13 +505,13 @@ cardsEl.addEventListener('pointerover', (e) => {
   clearTimeout(hoverTimer);
   const s = STYLES.find((x) => x.id === card.dataset.id);
   if (state.presenting) return;
-  if (hair.current !== s.id) { hair.show(s, 'drop'); setBigTitle(s.name); }
+  if (hair.current !== s.id || (s.kind === 'photo' && !photoStage.active)) { preview(s); setBigTitle(s.name); }
 });
 cardsEl.addEventListener('pointerleave', () => {
   clearTimeout(hoverTimer);
   hoverTimer = setTimeout(() => {
     if (state.presenting) return;
-    if (hair.current !== state.selected.id) { hair.show(state.selected, 'drop'); setBigTitle(state.selected.name); }
+    if (hair.current !== state.selected.id || state.selected.kind === 'photo') { preview(state.selected); setBigTitle(state.selected.name); }
   }, 280);
 });
 cardsEl.addEventListener('click', (e) => {
@@ -506,6 +530,7 @@ $('#swatches').addEventListener('click', (e) => {
   state.color = c;
   $$('.sw').forEach((x) => x.classList.toggle('is-active', x === sw));
   hair.setColor(c.hex, c.tip);
+  photoStage.setColor(c.hex, c.tip, c.id === COLORS[0].id);
   $('#dColor').textContent = c.name;
 });
 
@@ -518,6 +543,7 @@ function setLook(look, animate = true) {
   pill.style.width = `${btn.offsetWidth}px`;
   pill.style.transform = `translateX(${btn.offsetLeft - 4}px)`;
   if (!state.scanned) return;
+  if (photoStage.active) setTimeout(() => photoStage.setClient(look === 'real' ? { shots: state.faceShots, skin: avatar.scan?.skin } : null), animate ? 450 : 0);
   if (animate) {
     gsap.timeline()
       .to(avatar.uniforms.uReveal, { value: 0.55, duration: 0.45, ease: 'power2.in' })
@@ -536,7 +562,7 @@ function present() {
   stage.controls.enabled = false; stage.controls.autoRotate = false;
   $('[data-action="rotate"]').classList.remove('is-on');
   if (state.compare) setCompare(false);
-  if (hair.current !== s.id) hair.show(s, 'drop');
+  if (hair.current !== s.id) preview(s);
   const pres = $('#present');
   pres.classList.add('is-on');
   $('#presentName').textContent = s.name;
@@ -632,7 +658,7 @@ document.addEventListener('click', async (e) => {
       const go = () => {
         stopScan();
         if (state.screen === 'site') leaveSite();
-        if (state.scanned) { avatar.setMannequin(); state.scanned = false; renderThumbs(); }
+        if (state.scanned) { avatar.setMannequin(); state.scanned = false; state.faceShots = null; photoStage.setClient(null); renderThumbs(); }
         enterStudio();
       };
       if (state.screen === 'site') curtain(async () => go()); else go();
@@ -705,7 +731,7 @@ boot();
 
 // accès debug
 window.__miroir = {
-  stage, avatar, hair, state, STYLES, select, processCapture, site, buildFace, router,
+  stage, avatar, hair, state, STYLES, select, processCapture, site, buildFace, router, photoStage,
   /** Kit artiste : le mannequin en .glb (base64), pour scratch/export-mannequin. */
   async exportMannequin() {
     const { exportMannequinGlb } = await import('./three/exportMannequin.js');

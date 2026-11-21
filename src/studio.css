@@ -236,3 +236,23 @@ a.btn { text-decoration: none; cursor: none; }
 .dep__kit:hover { color: var(--gold); }
 body.is-dragging #studio::after { content: 'Déposez votre coiffure .glb'; position: fixed; inset: 16px; z-index: 80; display: grid; place-items: center; border: 1px dashed var(--gold); border-radius: 28px; background: rgba(var(--bg-rgb), 0.55); color: var(--gold); font-family: var(--serif); font-size: 32px; pointer-events: none; }
 @media (max-width: 760px) { .panel__add { display: none; } }
+
+/* ---------- coiffures-photos ---------- */
+.pstage { position: absolute; inset: 0; z-index: 1; display: none; pointer-events: none; }
+.pstage.is-on { display: block; }
+.pstage__frame { position: absolute; left: 50%; top: 52%; translate: -50% -50%; width: min(42vw, 66vh); aspect-ratio: 4 / 5; pointer-events: auto; cursor: grab; touch-action: pan-y; }
+.pstage__cv { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.pstage.is-loading .pstage__frame::after { content: 'Préparation de la photo…'; position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase; }
+.pstage__nav { position: absolute; left: 50%; bottom: calc(var(--pad) + 86px); translate: -50% 0; display: flex; align-items: center; gap: 14px; pointer-events: auto; }
+.pstage__btn { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line); background: rgba(var(--bg-rgb), 0.4); backdrop-filter: blur(10px); display: grid; place-items: center; }
+.pstage__btn svg { width: 16px; height: 16px; fill: none; stroke: var(--ivory); stroke-width: 1.6; }
+.pstage__label { min-width: 130px; text-align: center; font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--ivory-2); }
+.pstage__dots { position: absolute; left: 50%; bottom: calc(var(--pad) + 70px); translate: -50% 0; display: flex; gap: 8px; pointer-events: auto; }
+.pstage__dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--line); cursor: pointer; transition: background 0.4s, transform 0.4s; }
+.pstage__dots i.is-on { background: var(--gold); transform: scale(1.3); }
+.pstage.is-single .pstage__nav, .pstage.is-single .pstage__dots { display: none; }
+@media (orientation: portrait), (max-width: 980px) {
+  .pstage__frame { top: 40%; width: min(86vw, 52vh); }
+  .pstage__nav { bottom: auto; top: calc(40% + min(43vw, 26vh) + 12px); }
+  .pstage__dots { display: none; }
+}

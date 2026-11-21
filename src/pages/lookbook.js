@@ -60,7 +60,9 @@ export default {
   `,
   mount(root, { hair, STYLES, onTry }) {
     reveals(root);
-    let list = STYLES.slice();
+    // le défilé 3D ne montre que les coiffures en 3D ; les coiffures-photos restent dans l'index
+    const D = () => STYLES.filter((s) => s.kind !== 'photo');
+    let list = D();
     let idx = -1;
     const show = $('#lbShow', root), name = $('#lbName', root), big = $('#lbBig', root), rail = $('#lbRail', root);
     const inst = { spin: 0 };
@@ -130,7 +132,7 @@ export default {
       const b = e.target.closest('.chip'); if (!b) return;
       $$('.chip', root).forEach((c) => c.classList.toggle('is-on', c === b));
       const cat = b.dataset.cat;
-      list = cat === 'all' ? STYLES.slice() : STYLES.filter((s) => s.cat === cat);
+      list = cat === 'all' ? D() : D().filter((s) => s.cat === cat);
       buildRail();
       ScrollTrigger.refresh();
       window.__garoLenis?.scrollTo(show, { duration: 0.9 });
@@ -150,7 +152,7 @@ export default {
     const pick = (card) => {
       const s = STYLES.find((x) => x.id === card.dataset.id);
       $$('.lb-card', grid).forEach((c) => c.classList.toggle('is-on', c === card));
-      if (hair.current !== s.id) hair.show(s, 'drop');
+      if (s.kind !== 'photo' && hair.current !== s.id) hair.show(s, 'drop');
       label.textContent = s.name;
     };
     grid.addEventListener('pointerover', (e) => { const c = e.target.closest('.lb-card'); if (c && active === 'index' && e.pointerType === 'mouse') pick(c); });

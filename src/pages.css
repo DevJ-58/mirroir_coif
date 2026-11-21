@@ -492,3 +492,18 @@ body.on-light .burger { color: var(--ink-d); }
   .at-step { padding: 20px 18px 22px; }
 }
 .at-step__hint.is-warn { color: #e8907a; }
+/* atelier : vues et ovale du visage */
+.at { padding-right: max(var(--pad), 34vw); }
+.at-vlist { display: grid; gap: 10px; margin: 16px 0 0; padding: 0; list-style: none; }
+.at-vlist li { display: grid; grid-template-columns: 64px 1fr 30px; align-items: center; gap: 14px; padding: 8px; border-radius: 16px; border: 1px solid var(--line); cursor: pointer; transition: border-color 0.4s, background 0.4s; }
+.at-vlist li.is-on { border-color: var(--gold); background: rgba(var(--gold-rgb), 0.06); }
+.at-vlist img { width: 64px; height: 64px; object-fit: cover; border-radius: 10px; background: #fff; }
+.at-vlist select { padding: 8px 0; border: 0; border-bottom: 1px solid var(--line); background: none; color: var(--ivory); font: inherit; font-size: 14px; outline: none; cursor: pointer; }
+.at-vlist select option { background: var(--ink); }
+.at-vlist button { width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--line); color: var(--ivory-2); }
+.at-edit { position: relative; margin: 6px 0 18px; border-radius: 18px; overflow: hidden; line-height: 0; background: #fff; }
+.at-edit canvas { width: 100%; height: auto; }
+.at-oval { position: absolute; left: 0; top: 0; display: none; touch-action: none; }
+.at-oval ellipse { fill: rgba(var(--gold-rgb), 0.12); stroke: var(--gold); stroke-width: 2; stroke-dasharray: 6 5; cursor: move; }
+.at-oval .h { fill: var(--gold); stroke: #fff; stroke-width: 2; cursor: grab; }
+@media (orientation: portrait), (max-width: 760px) { .at { padding-right: var(--pad); } }

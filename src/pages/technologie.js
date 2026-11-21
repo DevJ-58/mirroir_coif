@@ -10,7 +10,7 @@ const STEPS = [
   { n: '468', u: 'points', t: 'Le visage, point par point', d: 'La caméra repère 468 points du visage à chaque image : contour des yeux, arête du nez, lèvres, mâchoire. Ils fixent la position exacte de la tête.' },
   { n: '3', u: 'prises', t: 'Face et trois-quarts', d: 'Une photo de face, nette et bien éclairée, puis un quart de tour de chaque côté. Les trois vues affinent le relief : nez, pommettes, menton.' },
   { n: '1', u: 'mannequin', t: 'Le visage se pose', d: 'Le relief et la photo du visage se fondent dans la tête unique du mannequin GARO, au teint de la personne. Crâne, oreilles et cou restent ceux du mannequin.' },
-  { n: '12', u: 'coiffures', t: 'Les cheveux poussent', d: 'Chaque coiffure est construite une fois, sur ce mannequin. Elle tombe donc juste sur chaque visage, et un salon peut en ajouter de nouvelles en déposant un fichier 3D.' },
+  { n: '12', u: 'coiffures', t: 'Les cheveux poussent', d: 'Chaque coiffure est construite une fois, sur ce mannequin. Elle tombe donc juste sur chaque visage, et un salon peut en ajouter de nouvelles en déposant les photos d’un mannequin coiffé.' },
   { n: '0', u: 'image envoyée', t: 'Rien ne sort du salon', d: 'Tout le calcul se fait sur l’appareil : la tablette, la télé ou la borne. Aucune photo n’est envoyée, aucune n’est conservée après la séance.' },
 ];
 

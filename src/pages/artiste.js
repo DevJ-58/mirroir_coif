@@ -1,12 +1,14 @@
-// Atelier artiste : une photo de coiffure → modèle 3D (TRELLIS, gratuit) → découpage des cheveux
-// → calage sur le mannequin GARO → publication dans la cabine. Tout est enregistré sur l'appareil.
-import gsap from 'gsap';
+// Atelier artiste : une coiffure = une ou plusieurs photos d'un mannequin coiffé (face, trois-quarts,
+// profil, dos). L'artiste place l'ovale du visage ; en cabine, le visage du client s'y pose.
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import { $, $$, ease, mix, P, pageHero, pageFoot, reveals, eyebrow, esc } from './kit.js';
+import { $, $$, P, pageHero, pageFoot, reveals, eyebrow } from './kit.js';
 
-const TOKEN_KEY = 'garo-hf-token';
-const MAX_VIEWS = 4;
-const store = { get: (k) => { try { return localStorage.getItem(k) || ''; } catch { return ''; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch { /* stockage indisponible */ } } };
+const KINDS = [
+  ['face', 'Face'], ['q-left', 'Trois-quarts, regard à gauche'], ['q-right', 'Trois-quarts, regard à droite'],
+  ['p-left', 'Profil gauche'], ['p-right', 'Profil droit'], ['back', 'Dos'],
+];
+const MAX_VIEWS = 6;
+const DEFAULT_FACE = { cx: 0.5, cy: 0.36, rx: 0.13, ry: 0.19, a: 0 };
 
 export default {
   id: 'artiste', path: '/artiste', title: 'Atelier artiste', label: 'Atelier',
@@ -14,62 +16,48 @@ export default {
     ${pageHero({
       kicker: 'Atelier artiste',
       title: 'Ate|lier',
-      lede: 'Déposez la photo d’une coiffure. GARO la sculpte en 3D, garde les cheveux, la pose sur le mannequin et l’ajoute à la cabine.',
+      lede: 'Déposez les photos d’un mannequin coiffé. Placez l’ovale du visage : en cabine, le visage du client s’y pose, avec son teint.',
     })}
     <section class="pg-s at" id="atelier">
       <div class="at__col">
         <article class="at-step is-on" data-step="0">
-          <header><span class="at-step__n">01</span><h2>La photo</h2></header>
-          <p class="at-step__hint">Une vue par photo (face, trois-quarts ou dos), coiffure entière, fond uni si possible. Si votre image contient plusieurs vues, sélectionnez-en une à la souris, puis ajoutez les autres une par une.</p>
+          <header><span class="at-step__n">01</span><h2>Les photos</h2></header>
+          <p class="at-step__hint">Un mannequin clair, la coiffure entière, fond uni. Une vue par photo : face, trois-quarts, profil, dos. Si une image contient plusieurs vues, entourez-en une à la souris puis ajoutez-la ; recommencez pour les autres.</p>
           <label class="at-drop" id="atDrop">
-            <input type="file" id="atFile" accept="image/*,.glb" hidden />
-            <span class="at-drop__t">Choisir une photo</span>
-            <span class="at-drop__s">ou la glisser ici · JPG, PNG</span>
+            <input type="file" id="atFile" accept="image/*" multiple hidden />
+            <span class="at-drop__t">Choisir des photos</span>
+            <span class="at-drop__s">ou les glisser ici · JPG, PNG</span>
           </label>
-          <div class="at-crop" id="atCrop" hidden>
-            <canvas id="atCanvas"></canvas>
-            <i class="at-crop__sel" id="atSel"></i>
-          </div>
+          <div class="at-crop" id="atCrop" hidden><canvas id="atCanvas"></canvas><i class="at-crop__sel" id="atSel"></i></div>
           <div class="at-crop__bar" id="atCropBar" hidden>
-            <button class="link-btn" type="button" id="atAll">Toute l’image</button>
+            <button class="link-btn" type="button" id="atAll">Image entière</button>
             <button class="btn btn--ghost btn--sm" type="button" id="atAdd"><span class="btn__label">Ajouter cette vue</span></button>
           </div>
-          <ol class="at-views" id="atViews"></ol>
+          <ol class="at-vlist" id="atViews"></ol>
         </article>
 
         <article class="at-step" data-step="1">
-          <header><span class="at-step__n">02</span><h2>Sculpture en 3D</h2></header>
-          <p class="at-step__hint">La photo est envoyée au service gratuit <b>TRELLIS</b> (Microsoft, hébergé par Hugging Face). Comptez 30 secondes à quelques minutes selon la file d’attente.</p>
-          <button class="btn btn--primary magnetic" type="button" id="atGo" disabled><span class="btn__bg"></span><span class="btn__label">Transformer en 3D</span><span class="btn__dot"></span></button>
-          <div class="at-prog" id="atProg" hidden><i id="atBar"></i></div>
+          <header><span class="at-step__n">02</span><h2>Le visage</h2></header>
+          <p class="at-step__hint" id="atFaceHint">Pour chaque vue, placez l’ovale sur le visage du mannequin : du haut du front au menton, d’une joue à l’autre. Glissez pour déplacer, tirez les poignées pour ajuster.</p>
+          <div class="at-edit" id="atEdit">
+            <canvas id="atView"></canvas>
+            <svg class="at-oval" id="atOval" aria-hidden="true">
+              <ellipse id="atEll" /><circle class="h" id="atHx" r="9" /><circle class="h" id="atHy" r="9" />
+            </svg>
+          </div>
+          <div class="at-sliders">
+            <label><span>Inclinaison <b id="vTilt">0°</b></span><input type="range" id="sTilt" min="-25" max="25" step="1" value="0" /></label>
+          </div>
+          <div class="at-row">
+            <button class="link-btn" type="button" id="atTest">Tester avec un visage</button>
+            <input type="file" id="atFaceFile" accept="image/*" hidden />
+            <button class="link-btn" type="button" id="atCompare" hidden>Voir la photo d’origine</button>
+          </div>
           <p class="at-status" id="atStatus" aria-live="polite"></p>
-          <details class="at-opt">
-            <summary>Options</summary>
-            <label class="dep__f"><span>Jeton Hugging Face (facultatif)</span><input id="atToken" type="password" autocomplete="off" placeholder="hf_…" /></label>
-            <p class="at-step__hint">Un compte Hugging Face gratuit donne un quota de calcul plus large. Le jeton reste sur cet appareil.</p>
-          </details>
         </article>
 
         <article class="at-step" data-step="2">
-          <header><span class="at-step__n">03</span><h2>Découpage et calage</h2></header>
-          <p class="at-step__hint" id="atAuto">GARO garde les cheveux et retire la tête générée. Ajustez si besoin : le résultat s’affiche sur le mannequin.</p>
-          <div class="at-sliders">
-            <label><span>Découpage <b id="vThr"></b></span><input type="range" id="sThr" min="0.2" max="0.85" step="0.01" value="0.5" /></label>
-            <label><span>Taille <b id="vScale"></b></span><input type="range" id="sScale" min="0.6" max="1.6" step="0.01" value="1" /></label>
-            <label><span>Hauteur <b id="vDy"></b></span><input type="range" id="sDy" min="-10" max="10" step="0.1" value="0" /></label>
-            <label><span>Avant / arrière <b id="vDz"></b></span><input type="range" id="sDz" min="-10" max="10" step="0.1" value="0" /></label>
-            <label><span>Rotation <b id="vYaw"></b></span><input type="range" id="sYaw" min="-180" max="180" step="1" value="0" /></label>
-            <label><span>Inclinaison <b id="vTilt"></b></span><input type="range" id="sTilt" min="-35" max="35" step="1" value="0" /></label>
-          </div>
-          <div class="at-row">
-            <button class="link-btn" type="button" id="atRaw">Voir le modèle brut</button>
-            <button class="link-btn" type="button" id="atSpin">Faire tourner</button>
-            <button class="link-btn" type="button" id="atReset">Réinitialiser</button>
-          </div>
-        </article>
-
-        <article class="at-step" data-step="3">
-          <header><span class="at-step__n">04</span><h2>Publier</h2></header>
+          <header><span class="at-step__n">03</span><h2>Publier</h2></header>
           <form class="at-form" id="atForm" novalidate>
             <label class="dep__f"><span>Nom</span><input name="name" required maxlength="40" placeholder="Locks attachées, dégradé" /></label>
             <label class="dep__f"><span>Catégorie</span><select name="cat">${CATEGORIES.filter((c) => c.id !== 'all').map((c) => `<option value="${c.id}">${c.label}</option>`).join('')}</select></label>
@@ -90,29 +78,26 @@ export default {
     <section class="pg-s at-tips">
       ${eyebrow('Pour un bon résultat')}
       <div class="ab-vals__grid">
-        <article data-reveal><span class="sl-why__n">I</span><h3>Une vue nette</h3><p>Photo bien éclairée, coiffure entière dans le cadre, sans texte ni autre personne. Plusieurs vues (face, profil, dos) améliorent le volume.</p></article>
-        <article data-reveal><span class="sl-why__n">II</span><h3>Cheveux contrastés</h3><p>Le découpage distingue les cheveux de la peau par la couleur. Un mannequin clair et des cheveux foncés donnent le meilleur résultat.</p></article>
-        <article data-reveal><span class="sl-why__n">III</span><h3>Ajuster, puis publier</h3><p>Réglez le découpage et le calage en faisant tourner le mannequin. La coiffure publiée apparaît dans la cabine de cet appareil.</p></article>
+        <article data-reveal><span class="sl-why__n">I</span><h3>Le même mannequin</h3><p>Des photos d’un mannequin clair au visage lisse, sous une lumière douce. Le corps du mannequin prend le teint du client.</p></article>
+        <article data-reveal><span class="sl-why__n">II</span><h3>Plusieurs vues</h3><p>Face, trois-quarts et dos : en cabine, le client passe d’une vue à l’autre comme s’il tournait autour de sa tête.</p></article>
+        <article data-reveal><span class="sl-why__n">III</span><h3>L’ovale juste</h3><p>Du haut du front au menton. Les cheveux de la photo restent devant le visage : franges et contours sont conservés.</p></article>
       </div>
-      <p class="sl-note">Vous avez déjà un fichier 3D modélisé sur le mannequin GARO ? Déposez-le directement dans la cabine. <a href="/mannequin/garo-mannequin.glb" download>Télécharger le mannequin GARO (.glb)</a></p>
     </section>
     ${pageFoot({ path: '/salons', label: 'Salons', desc: 'Équiper votre salon, formules et simulateur.' })}
   `,
-  mount(root, { hair, avatar, CATEGORIES, publish, onTry, toast }) {
+  mount(root, { hair, publishPhoto, onTry, toast, client: getClient }) {
     reveals(root);
     hair.hideAll(0.5);
     const steps = $$('.at-step', root);
     const unlock = (i) => steps.forEach((s, k) => s.classList.toggle('is-on', k <= i));
-    const status = $('#atStatus', root), bar = $('#atBar', root), prog = $('#atProg', root);
-    const tokenEl = $('#atToken', root);
-    tokenEl.value = store.get(TOKEN_KEY);
-    tokenEl.addEventListener('change', () => store.set(TOKEN_KEY, tokenEl.value.trim()));
+    const status = $('#atStatus', root);
+    const views = [];   // { kind, blob, url, img, face }
+    let cur = -1;
 
-    // ---------- 1. photo et sélection d'une vue ----------
+    // ---------- 1. photos et découpe ----------
     const cv = $('#atCanvas', root), cx = cv.getContext('2d'), sel = $('#atSel', root), crop = $('#atCrop', root);
-    let img = null, rect = null;           // rect en pixels de l'image
-    const views = [];                      // Blob[]
-    function drawImage() {
+    let img = null, rect = null, queue = [];
+    function showCrop() {
       const k = Math.min(1, 1600 / Math.max(img.width, img.height));
       cv.width = Math.round(img.width * k); cv.height = Math.round(img.height * k);
       cx.drawImage(img, 0, 0, cv.width, cv.height);
@@ -120,188 +105,217 @@ export default {
       rect = null; paintSel();
     }
     function paintSel() {
-      if (!rect) { sel.style.display = 'none'; return; }
+      if (!rect || !img) { sel.style.display = 'none'; return; }
       const b = cv.getBoundingClientRect(), s = b.width / img.width;
       Object.assign(sel.style, { display: 'block', left: `${rect.x * s}px`, top: `${rect.y * s}px`, width: `${rect.w * s}px`, height: `${rect.h * s}px` });
     }
     let drag = null;
-    cv.addEventListener('pointerdown', (e) => {
-      const b = cv.getBoundingClientRect(), s = img.width / b.width;
-      drag = { x: (e.clientX - b.left) * s, y: (e.clientY - b.top) * s, s, b };
-      cv.setPointerCapture(e.pointerId);
-    });
+    cv.addEventListener('pointerdown', (e) => { const b = cv.getBoundingClientRect(), s = img.width / b.width; drag = { x: (e.clientX - b.left) * s, y: (e.clientY - b.top) * s, s, b }; cv.setPointerCapture(e.pointerId); });
     cv.addEventListener('pointermove', (e) => {
       if (!drag) return;
       const x = (e.clientX - drag.b.left) * drag.s, y = (e.clientY - drag.b.top) * drag.s;
       rect = { x: Math.max(0, Math.min(drag.x, x)), y: Math.max(0, Math.min(drag.y, y)), w: Math.abs(x - drag.x), h: Math.abs(y - drag.y) };
       paintSel();
     });
-    cv.addEventListener('pointerup', () => { drag = null; if (rect && (rect.w < 20 || rect.h < 20)) rect = null; paintSel(); });
-    window.addEventListener('resize', paintSel);
+    cv.addEventListener('pointerup', () => { drag = null; if (rect && (rect.w < 30 || rect.h < 30)) rect = null; paintSel(); });
+    const onResize = () => { paintSel(); drawEditor(); };
+    window.addEventListener('resize', onResize);
     $('#atAll', root).addEventListener('click', () => { rect = null; paintSel(); });
 
-    const cropBlob = () => new Promise((res) => {
+    const cutBlob = () => new Promise((res) => {
       const r = rect || { x: 0, y: 0, w: img.width, h: img.height };
-      // carré, avec une marge blanche : le service attend un objet centré
-      const side = Math.round(Math.max(r.w, r.h) * 1.12);
-      const c = document.createElement('canvas'); c.width = c.height = Math.min(1024, side);
-      const k = c.width / side, g = c.getContext('2d');
-      g.fillStyle = '#ffffff'; g.fillRect(0, 0, c.width, c.height);
-      g.drawImage(img, r.x, r.y, r.w, r.h, (c.width - r.w * k) / 2, (c.height - r.h * k) / 2, r.w * k, r.h * k);
-      c.toBlob((b) => res(b), 'image/png');
+      const k = Math.min(1, 1400 / Math.max(r.w, r.h));
+      const c = document.createElement('canvas'); c.width = Math.round(r.w * k); c.height = Math.round(r.h * k);
+      c.getContext('2d').drawImage(img, r.x, r.y, r.w, r.h, 0, 0, c.width, c.height);
+      c.toBlob(res, 'image/jpeg', 0.92);
     });
-    function renderViews() {
-      $('#atViews', root).innerHTML = views.map((b, i) => `<li><img src="${URL.createObjectURL(b)}" alt="Vue ${i + 1}" /><button type="button" data-rm="${i}" aria-label="Retirer la vue">×</button></li>`).join('');
-      $('#atGo', root).disabled = !views.length && !img;
+    async function addView(blob) {
+      if (views.length >= MAX_VIEWS) { toast('Six vues au plus par coiffure'); return; }
+      const url = URL.createObjectURL(blob);
+      const im = new Image(); im.src = url; await im.decode();
+      const used = new Set(views.map((v) => v.kind));
+      const kind = (KINDS.find(([k]) => !used.has(k)) || KINDS[0])[0];
+      views.push({ kind, blob, url, img: im, face: kind === 'back' ? null : { ...DEFAULT_FACE } });
+      renderList();
+      select(views.length - 1);
+      unlock(2);
     }
     $('#atAdd', root).addEventListener('click', async () => {
-      if (!img || views.length >= MAX_VIEWS) return;
-      views.push(await cropBlob());
-      rect = null; paintSel(); renderViews();
-      unlock(1);
+      if (!img) return;
+      await addView(await cutBlob());
+      rect = null; paintSel();
+      if (queue.length) loadNext();
     });
-    $('#atViews', root).addEventListener('click', (e) => { const b = e.target.closest('[data-rm]'); if (b) { views.splice(+b.dataset.rm, 1); renderViews(); } });
+    function renderList() {
+      $('#atViews', root).innerHTML = views.map((v, i) => `<li class="${i === cur ? 'is-on' : ''}" data-i="${i}">
+        <img src="${v.url}" alt="" />
+        <select data-kind="${i}" aria-label="Type de vue">${KINDS.map(([k, l]) => `<option value="${k}"${k === v.kind ? ' selected' : ''}>${l}</option>`).join('')}</select>
+        <button type="button" data-rm="${i}" aria-label="Retirer la vue">×</button>
+      </li>`).join('');
+    }
+    $('#atViews', root).addEventListener('click', (e) => {
+      const rm = e.target.closest('[data-rm]');
+      if (rm) { const i = +rm.dataset.rm; URL.revokeObjectURL(views[i].url); views.splice(i, 1); cur = Math.min(cur, views.length - 1); renderList(); if (cur >= 0) select(cur); else drawEditor(); return; }
+      const li = e.target.closest('li'); if (li && !e.target.closest('select')) select(+li.dataset.i);
+    });
+    $('#atViews', root).addEventListener('change', (e) => {
+      const s = e.target.closest('[data-kind]'); if (!s) return;
+      const v = views[+s.dataset.kind];
+      v.kind = s.value;
+      v.face = v.kind === 'back' ? null : (v.face || { ...DEFAULT_FACE });
+      select(+s.dataset.kind);
+    });
 
-    async function takeFile(f) {
-      if (!f) return;
-      if (/\.glb$/i.test(f.name)) { await useModel(await f.arrayBuffer()); return; }
-      if (!f.type.startsWith('image/')) { toast('Format attendu : une photo (JPG, PNG)'); return; }
-      img = new Image();
-      img.src = URL.createObjectURL(f);
-      await img.decode();
-      drawImage();
-      renderViews();
+    async function loadNext() {
+      const f = queue.shift(); if (!f) return;
+      img = new Image(); img.src = URL.createObjectURL(f); await img.decode();
+      showCrop();
       unlock(1);
     }
-    $('#atFile', root).addEventListener('change', (e) => { const f = e.target.files?.[0]; e.target.value = ''; takeFile(f); });
+    async function takeFiles(list) {
+      const files = [...list].filter((f) => f.type.startsWith('image/'));
+      if (!files.length) { toast('Format attendu : des photos (JPG, PNG)'); return; }
+      queue = files; await loadNext();
+    }
+    $('#atFile', root).addEventListener('change', (e) => { const fl = [...(e.target.files || [])]; e.target.value = ''; takeFiles(fl); });
     const drop = $('#atDrop', root);
     drop.addEventListener('dragover', (e) => { e.preventDefault(); drop.classList.add('is-over'); });
     drop.addEventListener('dragleave', () => drop.classList.remove('is-over'));
-    drop.addEventListener('drop', (e) => { e.preventDefault(); drop.classList.remove('is-over'); takeFile(e.dataTransfer?.files?.[0]); });
+    drop.addEventListener('drop', (e) => { e.preventDefault(); drop.classList.remove('is-over'); takeFiles(e.dataTransfer?.files || []); });
 
-    // ---------- 2. conversion ----------
-    let abort = null;
-    const setStatus = (t, p) => { status.textContent = t; if (p != null) { prog.hidden = false; gsap.to(bar, { scaleX: p, duration: 0.6, ease: 'power2.out' }); } };
-    $('#atGo', root).addEventListener('click', async () => {
-      const list = views.length ? views : [await cropBlob()];
-      const btn = $('#atGo', root);
-      btn.disabled = true;
-      abort = new AbortController();
+    // ---------- 2. ovale du visage ----------
+    const vc = $('#atView', root), vg = vc.getContext('2d'), svg = $('#atOval', root);
+    const ell = $('#atEll', root), hx = $('#atHx', root), hy = $('#atHy', root), tilt = $('#sTilt', root);
+    let face = null;     // visage de test { shots, skin }
+    let showOrig = false;
+    const prepared = new Map();   // vue → analyse (pour l'aperçu)
+
+    function select(i) {
+      cur = i;
+      $$('#atViews li', root).forEach((li, k) => li.classList.toggle('is-on', k === i));
+      const v = views[i];
+      tilt.value = Math.round(((v.face?.a || 0) * 180) / Math.PI);
+      $('#vTilt', root).textContent = `${tilt.value}°`;
+      $('#atFaceHint', root).textContent = v.kind === 'back'
+        ? 'Vue de dos : pas de visage à placer. Le corps prend le teint du client.'
+        : 'Placez l’ovale sur le visage du mannequin : du haut du front au menton, d’une joue à l’autre. Glissez pour déplacer, tirez les poignées pour ajuster.';
+      drawEditor();
+    }
+    async function drawEditor() {
+      const v = views[cur];
+      if (!v) { vc.width = vc.height = 0; svg.style.display = 'none'; return; }
+      const W = vc.parentElement.clientWidth || 600;
+      const k = W / v.img.width;
+      vc.width = Math.round(v.img.width * k); vc.height = Math.round(v.img.height * k);
+      if (face && !showOrig) {
+        try {
+          const { analyseView, compose } = await import('../photo/compose.js');
+          if (!prepared.has(v)) prepared.set(v, analyseView(v.img));
+          const V = await prepared.get(v);
+          V.kind = v.kind;
+          V.face = v.face ? { cx: v.face.cx * V.w, cy: v.face.cy * V.h, rx: v.face.rx * V.w, ry: v.face.ry * V.h, a: v.face.a } : null;
+          vg.drawImage(compose(V, face, {}), 0, 0, vc.width, vc.height);
+        } catch (e) { console.warn(e); vg.drawImage(v.img, 0, 0, vc.width, vc.height); }
+      } else vg.drawImage(v.img, 0, 0, vc.width, vc.height);
+      paintOval();
+    }
+    function paintOval() {
+      const v = views[cur];
+      if (!v?.face) { svg.style.display = 'none'; return; }
+      svg.style.display = 'block';
+      const W = vc.width, H = vc.height, f = v.face;
+      svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+      svg.style.width = `${W}px`; svg.style.height = `${H}px`;
+      const deg = (f.a * 180) / Math.PI;
+      ell.setAttribute('cx', f.cx * W); ell.setAttribute('cy', f.cy * H);
+      ell.setAttribute('rx', f.rx * W); ell.setAttribute('ry', f.ry * H);
+      ell.setAttribute('transform', `rotate(${deg} ${f.cx * W} ${f.cy * H})`);
+      const c = Math.cos(f.a), s = Math.sin(f.a);
+      hx.setAttribute('cx', f.cx * W + c * f.rx * W); hx.setAttribute('cy', f.cy * H + s * f.rx * W);
+      hy.setAttribute('cx', f.cx * W - s * f.ry * H); hy.setAttribute('cy', f.cy * H + c * f.ry * H);
+    }
+    let od = null;
+    svg.addEventListener('pointerdown', (e) => {
+      const v = views[cur]; if (!v?.face) return;
+      const b = svg.getBoundingClientRect();
+      od = { mode: e.target === hx ? 'rx' : e.target === hy ? 'ry' : 'move', x: e.clientX, y: e.clientY, f: { ...v.face }, W: b.width, H: b.height };
+      svg.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    svg.addEventListener('pointermove', (e) => {
+      if (!od) return;
+      const v = views[cur], dx = (e.clientX - od.x) / od.W, dy = (e.clientY - od.y) / od.H;
+      const c = Math.cos(od.f.a), s = Math.sin(od.f.a);
+      if (od.mode === 'move') { v.face.cx = od.f.cx + dx; v.face.cy = od.f.cy + dy; }
+      if (od.mode === 'rx') v.face.rx = Math.max(0.02, od.f.rx + (dx * c + dy * s * (od.H / od.W)));
+      if (od.mode === 'ry') v.face.ry = Math.max(0.02, od.f.ry + (-dx * s * (od.W / od.H) + dy * c));
+      paintOval();
+    });
+    svg.addEventListener('pointerup', () => { if (od) { od = null; if (face && !showOrig) drawEditor(); } });
+    tilt.addEventListener('input', () => {
+      const v = views[cur]; if (!v?.face) return;
+      v.face.a = (+tilt.value * Math.PI) / 180;
+      $('#vTilt', root).textContent = `${tilt.value}°`;
+      paintOval();
+    });
+    tilt.addEventListener('change', () => { if (face) drawEditor(); });
+
+    // visage de test : le scan en cours, sinon une photo choisie
+    $('#atTest', root).addEventListener('click', () => {
+      const c = getClient?.();
+      if (c) { face = c; status.textContent = 'Aperçu avec le visage scanné en cabine.'; afterFace(); return; }
+      $('#atFaceFile', root).click();
+    });
+    $('#atFaceFile', root).addEventListener('change', async (e) => {
+      const f = e.target.files?.[0]; e.target.value = ''; if (!f) return;
+      status.textContent = 'Lecture du visage…';
       try {
-        const { photoTo3D } = await import('../artist/convert.js');
-        const buf = await photoTo3D(list, { token: tokenEl.value.trim(), onStatus: setStatus, signal: abort.signal });
-        await useModel(buf);
-      } catch (e) {
-        if (e?.name === 'AbortError') return;
-        console.warn(e);
-        const m = String(e?.message || e);
-        setStatus(/quota|exceeded|GPU/i.test(m)
-          ? 'Quota gratuit atteint pour le moment. Réessayez plus tard, ou ajoutez un jeton Hugging Face gratuit dans les options.'
-          : `La conversion a échoué : ${m}`, null);
-      } finally { btn.disabled = false; }
+        const im = new Image(); im.src = URL.createObjectURL(f); await im.decode();
+        const { scanImages } = await import('../scan/scanner.js');
+        const { buildFace } = await import('../scan/face.js');
+        const shots = await scanImages([im]);
+        const sc = await buildFace(shots);
+        face = { shots, skin: sc.skin };
+        status.textContent = 'Aperçu avec ce visage. Ajustez l’ovale si besoin.';
+        afterFace();
+      } catch (er) { console.warn(er); status.textContent = 'Aucun visage trouvé sur cette photo.'; }
     });
+    function afterFace() { showOrig = false; $('#atCompare', root).hidden = false; $('#atCompare', root).textContent = 'Voir la photo d’origine'; drawEditor(); }
+    $('#atCompare', root).addEventListener('click', (e) => { showOrig = !showOrig; e.currentTarget.textContent = showOrig ? 'Voir l’aperçu' : 'Voir la photo d’origine'; drawEditor(); });
 
-    // ---------- 3. découpage, calage, aperçu ----------
-    let A = null, hairObj = null, raw = null, spin = false;
-    const S = { thr: $('#sThr', root), scale: $('#sScale', root), dy: $('#sDy', root), dz: $('#sDz', root), yaw: $('#sYaw', root), tilt: $('#sTilt', root) };
-    const val = () => ({ threshold: +S.thr.value, scale: +S.scale.value, dy: +S.dy.value, dz: +S.dz.value, yaw: (+S.yaw.value * Math.PI) / 180, tilt: (+S.tilt.value * Math.PI) / 180 });
-    function labels() {
-      $('#vThr', root).textContent = `${Math.round((1 - +S.thr.value) * 100)} %`;
-      $('#vScale', root).textContent = `× ${(+S.scale.value).toFixed(2)}`;
-      $('#vDy', root).textContent = `${(+S.dy.value).toFixed(1)} cm`;
-      $('#vDz', root).textContent = `${(+S.dz.value).toFixed(1)} cm`;
-      $('#vYaw', root).textContent = `${S.yaw.value}°`;
-      $('#vTilt', root).textContent = `${S.tilt.value}°`;
-    }
-    function clearPreview() {
-      [hairObj, raw].forEach((o) => { if (o) { avatar.group.remove(o); o.traverse((m) => m.isMesh && m.geometry.dispose()); } });
-      hairObj = null; raw = null;
-    }
-    let rebuildT = 0;
-    async function rebuild() {
-      if (!A) return;
-      const { buildHair } = await import('../artist/cleanup.js');
-      if (hairObj) { avatar.group.remove(hairObj); hairObj.traverse((m) => m.isMesh && m.geometry.dispose()); }
-      const r = buildHair(A, val());
-      hairObj = r.group;
-      avatar.group.add(hairObj);
-      if (raw) raw.visible = false;
-      const warn = r.parts >= 2 ? ' Attention : plusieurs têtes détectées. Sélectionnez une seule vue par image (étape 1), puis relancez.' : (r.fit > 0.55 ? ' Calage incertain : si l’image contient plusieurs vues, sélectionnez-en une seule (étape 1) ; sinon, ajustez taille et position.' : '');
-      $('#atAuto', root).textContent = `${r.triangles.toLocaleString('fr-FR')} triangles gardés, coiffure ajustée au crâne du mannequin.${warn || ' Ajustez si besoin.'}`;
-      $('#atAuto', root).classList.toggle('is-warn', Boolean(warn));
-      labels();
-    }
-    const schedule = () => { cancelAnimationFrame(rebuildT); rebuildT = requestAnimationFrame(rebuild); };
-    Object.values(S).forEach((s) => s.addEventListener('input', () => { labels(); schedule(); }));
-    async function useModel(buf) {
-      setStatus('Découpage des cheveux…', 0.95);
-      const { analyse } = await import('../artist/cleanup.js');
-      A = await analyse(buf);
-      A.buffer = buf;
-      clearPreview();
-      hair.hideAll(0.3);
-      await rebuild();
-      setStatus('Coiffure prête : vérifiez le calage sur le mannequin.', 1);
-      unlock(3);
-      window.__garoLenis?.scrollTo(steps[2], { duration: 1.2, offset: -100 });
-    }
-    $('#atRaw', root).addEventListener('click', async (e) => {
-      const btnRaw = e.currentTarget;
-      if (!A) return;
-      if (!raw) {
-        const { buildHair } = await import('../artist/cleanup.js');
-        raw = buildHair(A, { ...val(), threshold: -1 }).group;
-        raw.traverse((m) => { if (m.isMesh) { m.material = m.material.clone(); m.material.transparent = true; m.material.opacity = 0.5; m.material.depthWrite = false; } });
-        raw.visible = false;
-        avatar.group.add(raw);
-      }
-      raw.visible = !raw.visible;
-      btnRaw.textContent = raw.visible ? 'Masquer le modèle brut' : 'Voir le modèle brut';
-    });
-    $('#atSpin', root).addEventListener('click', (e) => { spin = !spin; e.currentTarget.textContent = spin ? 'Arrêter la rotation' : 'Faire tourner'; });
-    $('#atReset', root).addEventListener('click', () => { S.thr.value = 0.5; S.scale.value = 1; S.dy.value = 0; S.dz.value = 0; S.yaw.value = 0; S.tilt.value = 0; schedule(); });
-
-    // ---------- 4. publication ----------
+    // ---------- 3. publication ----------
     let published = null;
     $('#atForm', root).addEventListener('submit', async (e) => {
       e.preventDefault();
       const err = $('#atErr', root);
-      if (!hairObj) { err.textContent = 'Transformez d’abord une photo en 3D.'; return; }
-      const d = Object.fromEntries(new FormData(e.currentTarget));
+      const form = e.currentTarget;
+      if (!views.length) { err.textContent = 'Ajoutez au moins une photo.'; return; }
+      if (!views.some((v) => v.kind === 'face')) { err.textContent = 'Il faut une vue de face.'; return; }
+      const d = Object.fromEntries(new FormData(form));
       if (!d.name.trim()) { err.textContent = 'Donnez un nom à la coiffure.'; return; }
       err.textContent = '';
       const btn = $('#atPub', root); btn.disabled = true;
       try {
-        const { exportHair } = await import('../artist/cleanup.js');
-        const data = await exportHair(hairObj);
-        published = await publish({ name: d.name.trim(), cat: d.cat, duration: d.duration.trim(), price: d.price.trim(), desc: d.desc.trim(), data });
+        // la vue de face d'abord, puis l'ordre d'un tour de tête
+        const order = ['face', 'q-right', 'p-right', 'back', 'p-left', 'q-left'];
+        const list = views.slice().sort((a, b) => order.indexOf(a.kind) - order.indexOf(b.kind));
+        const out = [];
+        for (const v of list) out.push({ kind: v.kind, mime: 'image/jpeg', data: await v.blob.arrayBuffer(), face: v.face ? { ...v.face } : null });
+        published = await publishPhoto({ name: d.name.trim(), cat: d.cat, duration: d.duration.trim(), price: d.price.trim(), desc: d.desc.trim(), views: out });
         toast(`« ${published.name} » publiée dans la cabine`);
         $('#atOpen', root).hidden = false;
       } catch (er) { console.warn(er); err.textContent = 'Publication impossible : ' + (er?.message || er); }
       finally { btn.disabled = false; }
     });
-    $('#atOpen', root).addEventListener('click', () => { if (published) { clearPreview(); onTry(published.id); } });
+    $('#atOpen', root).addEventListener('click', () => { if (published) onTry(published.id); });
 
-    // ---------- mannequin ----------
-    const st = {
-      ws: ScrollTrigger.create({ trigger: '#atelier', start: 'top 80%', end: 'top 10%' }),
-      foot: ScrollTrigger.create({ trigger: '.at-tips', start: 'top 70%', end: 'top 10%' }),
-    };
+    // ---------- mannequin 3D : présent en ouverture, il s'efface dans l'atelier ----------
+    const st = { ws: ScrollTrigger.create({ trigger: '#atelier', start: 'top 85%', end: 'top 35%' }) };
     const PH = (s) => P({ x: s ? 0 : 0.26, y: s ? 0.12 : 0.03, theta: -0.4, r: s ? 128 : 100, sway: 1 });
-    const PW = (s) => P({ x: s ? 0 : 0.27, y: s ? -0.28 : 0.04, theta: 0.35, phi: 1.46, r: s ? 160 : 112, sway: 0.08 });
-    const inst = {
-      spin: 0,
-      pose(_, s) {
-        inst.spin = spin ? (performance.now() / 1000) * 0.8 : 0;
-        return mix(PH(s), PW(s), ease(st.ws.progress));
-      },
-      opacity() {
-        const s = window.matchMedia('(orientation: portrait), (max-width: 760px)').matches;
-        return 1 - 0.6 * st.foot.progress - (s ? 0.0 : 0);
-      },
-      destroy() { abort?.abort(); clearPreview(); },
+    return {
+      pose: (_, s) => PH(s),
+      opacity: () => 1 - st.ws.progress,
+      destroy() { window.removeEventListener('resize', onResize); views.forEach((v) => URL.revokeObjectURL(v.url)); },
     };
-    labels();
-    return inst;
   },
 };

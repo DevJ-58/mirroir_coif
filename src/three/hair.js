@@ -32,7 +32,9 @@ export class HairManager {
 
   get(style) {
     if (!this.cache.has(style.id)) {
-      const h = style.kind === 'glb' ? this._glb(style) : buildHairstyle(style.kind, DEFAULT_HEX, this.ctx);
+      const h = style.kind === 'glb' ? this._glb(style)
+        : style.kind === 'photo' ? { group: new THREE.Group(), common: { uColor: { value: new THREE.Color() }, uTip: { value: new THREE.Color() }, uGrow: { value: 1 } }, compiled: true }
+          : buildHairstyle(style.kind, DEFAULT_HEX, this.ctx);
       h.group.visible = false;
       h.common.uGrow.value = 0;
       this.parent.add(h.group);

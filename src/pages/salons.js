@@ -7,7 +7,7 @@ import { $, $$, clamp, ease, mix, P, pageHero, pageFoot, reveals, eyebrow } from
 const PLANS = [
   { id: 'essentiel', name: 'Essentiel', price: 15000, devices: 1, pitch: 'Un écran au fauteuil.', items: ['1 appareil (tablette ou téléphone)', 'Scan de tête et cabine d’essayage', 'Catalogue de démonstration', 'Mises à jour incluses'] },
   { id: 'salon', name: 'Salon', price: 35000, devices: 3, pitch: 'Le salon entier équipé.', items: ['Jusqu’à 3 appareils', 'Votre carte : coiffures, prix, durées', 'Mode vitrine pour la télévision', 'Réservation depuis la cabine'], best: true },
-  { id: 'maison', name: 'Maison', price: 75000, devices: 8, pitch: 'Plusieurs salons, une borne.', items: ['Jusqu’à 8 appareils, plusieurs adresses', 'Borne en libre-service', 'Dépôt de vos propres coiffures 3D', 'Accompagnement dédié'] },
+  { id: 'maison', name: 'Maison', price: 75000, devices: 8, pitch: 'Plusieurs salons, une borne.', items: ['Jusqu’à 8 appareils, plusieurs adresses', 'Borne en libre-service', 'Vos propres coiffures, en photos', 'Accompagnement dédié'] },
 ];
 const EXTRA = 5000;   // par appareil au-delà de la formule
 const DEVICES = {
