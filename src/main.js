@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import gsap from 'gsap';
 import { Stage } from './three/stage.js';
 import { Avatar } from './three/avatar.js';
-import { HairManager } from './three/hair.js';
-import { STYLES, CATEGORIES, COLORS } from './data/catalog.js';
+import { STYLES, CATEGORIES, COLORS, loadCatalog } from './data/catalog.js';
+import { createPhotoAvatar } from './photo/avatar.js';
 import { runVideoScan, scanImages, loadLandmarker } from './scan/scanner.js';
 import { buildFace } from './scan/face.js';
 import { initCursor, initMagnetic, setCursor } from './ui/cursor.js';
@@ -11,7 +11,6 @@ import { createSite, curtain, prepDraw } from './site/site.js';
 import { initExtras } from './studio/extras.js';
 import { initPanel } from './studio/panel.js';
 import { initDeposit } from './studio/deposit.js';
-import { createPhotoStage, photoThumb } from './photo/stage.js';
 import { createRouter } from './site/router.js';
 import { PAGES } from './pages/index.js';
 
@@ -22,12 +21,18 @@ const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const isPortrait = () => window.innerWidth / window.innerHeight < 1 || window.innerWidth <= 980;
 const fit = (r) => { const a = window.innerWidth / window.innerHeight; return a < 1.05 ? r * Math.min(1.75, 1.05 / a) : r; };
 
+// ---------- catalogue (photos de mannequins coiffés) ----------
+await loadCatalog();
+
 // ---------- scène ----------
+// La scène 3D ne se dessine plus : elle sert de « caméra » (cadrage, angle, glisser)
+// au mannequin-photo, qui affiche la vue correspondant à l'angle.
 const stage = new Stage($('#gl'));
-const avatar = new Avatar();
+stage.paused = true;
+const avatar = new Avatar();   // ne sert plus qu'à porter le résultat du scan (teint, réaliste / mannequin)
 stage.root.add(avatar.group);
-const hair = new HairManager(avatar.group);
-hair.onChange = (id) => avatar.showCurrentHair(!id);
+const photoClient = () => (state.scanned && avatar.realistic && state.faceShots ? { shots: state.faceShots, skin: avatar.scan?.skin } : null);
+const hair = createPhotoAvatar({ stage, el: $('#pavatar'), glEl: $('#gl'), getClient: () => photoClient() });
 
 const state = {
   screen: 'loader',
@@ -111,7 +116,6 @@ window.addEventListener('resize', () => {
 // ---------- chargement ----------
 // Seules les coiffures de l'accueil sont construites avant l'ouverture ;
 // les autres se construisent ensuite en arrière-plan, une par une.
-const FIRST = ['box-braids', 'afro'];
 async function boot() {
   // le logo se dessine trait par trait pendant le chargement
   const strokes = prepDraw($('.loader__logo'));
@@ -129,11 +133,11 @@ async function boot() {
   await nextFrame();
   setP(0.15, 'Sculpture du mannequin');
   await wait(250);
-  const first = [...new Set([...FIRST, state.selected.id])].map((id) => STYLES.find((s) => s.id === id));
+  const first = STYLES.slice(0, 3);
+  const { viewsOf } = await import('./photo/stage.js');
   for (let i = 0; i < first.length; i++) {
     setP(0.25 + (i / first.length) * 0.5, `Coiffure · ${first[i].name}`);
-    await nextFrame();
-    compileStyle(first[i]);
+    await viewsOf(first[i]).catch(() => {});
   }
   setP(0.9, 'Lumières du studio');
   await nextFrame();
@@ -148,24 +152,8 @@ async function boot() {
   backgroundBuild();
 }
 
-/** Construit une coiffure et compile ses matières sans l'afficher. */
-function compileStyle(s) {
-  const h = hair.get(s);
-  if (h.compiled) return;
-  const vis = h.group.visible;
-  h.group.visible = true;
-  stage.renderer.compile(stage.scene, stage.camera);
-  h.group.visible = vis;
-  h.compiled = true;
-}
-
 async function backgroundBuild() {
-  await wait(1800);
-  for (const s of STYLES) {
-    if (hair.cache.get(s.id)?.compiled) continue;
-    await idle();
-    compileStyle(s);
-  }
+  await wait(1200);
   loadLandmarker().catch(() => {}); // préchargement silencieux du scanner
   await idle();
   await renderThumbs();
@@ -176,7 +164,6 @@ function idle() {
 
 // ---------- site vitrine ----------
 function enterSite(first = false) {
-  if (photoStage.active) photoStage.hide();
   show('site');
   state.idle = false;
   if (first) { router.start(); site.intro(); } else site.enter();
@@ -307,15 +294,15 @@ async function processCapture(shots) {
   setStep(0);
   await wait(200);
   const scan = await buildFace(shots, setStep);
-  const cloud = makeCloud(scan.verts);
-  avatar.uniforms.uReveal.value = 0.0;
   avatar.setScan(scan);
   state.scanned = true;
   state.faceShots = shots;
-  photoStage.setClient({ shots, skin: scan.skin });
+  hair.refresh();
+  hair.setReveal(0);
+  await hair.show(state.selected);
   pctTween(88, 1.2);
-  gsap.to(avatar.uniforms.uReveal, { value: 1, duration: 2.2, ease: 'power2.inOut' });
-  gsap.to(cloud.material, { opacity: 0, duration: 1.6, delay: 0.8, onComplete: () => { cloud.parent.remove(cloud); cloud.geometry.dispose(); } });
+  const rv = { v: 0 };
+  gsap.to(rv, { v: 1, duration: 2.2, ease: 'power2.inOut', onUpdate: () => hair.setReveal(rv.v) });
   await wait(2300);
 
   // 4. vignettes
@@ -324,31 +311,6 @@ async function processCapture(shots) {
   await renderThumbs();
   await wait(700);
   enterStudio();
-}
-
-function makeCloud(verts) {
-  const N = 468;
-  const target = Float32Array.from(verts);
-  const start = new Float32Array(N * 3);
-  for (let i = 0; i < N; i++) {
-    const v = new THREE.Vector3().randomDirection().multiplyScalar(18 + Math.random() * 30);
-    start[i * 3] = v.x; start[i * 3 + 1] = v.y + 2; start[i * 3 + 2] = v.z;
-  }
-  const geo = new THREE.BufferGeometry();
-  const pos = new THREE.BufferAttribute(Float32Array.from(start), 3);
-  geo.setAttribute('position', pos);
-  const mat = new THREE.PointsMaterial({ color: '#f3d9a8', size: 0.42, transparent: true, opacity: 1, depthWrite: false, blending: THREE.AdditiveBlending, sizeAttenuation: true });
-  const pts = new THREE.Points(geo, mat);
-  avatar.group.add(pts);
-  const o = { t: 0 };
-  gsap.to(o, {
-    t: 1, duration: 1.6, ease: 'expo.inOut',
-    onUpdate: () => {
-      for (let i = 0; i < N * 3; i++) pos.array[i] = start[i] + (target[i] - start[i]) * o.t;
-      pos.needsUpdate = true;
-    },
-  });
-  return pts;
 }
 
 // ---------- studio ----------
@@ -376,23 +338,12 @@ function toast(text) {
 }
 
 const panelCtl = initPanel({ STYLES });
-// coiffures-photos : une scène photo prend la place du mannequin 3D
-const photoStage = createPhotoStage($('#photoStage'));
-function preview(st) {
-  if (st?.kind === 'photo') {
-    hair.hideAll(0.3);
-    photoStage.show(st);
-    gsap.to('#gl', { opacity: 0, duration: 0.4 });
-  } else {
-    if (photoStage.active) { photoStage.hide(); gsap.to('#gl', { opacity: 1, duration: 0.5 }); }
-    if (st) hair.show(st, 'drop');
-  }
-}
-const photoClient = () => (state.scanned && avatar.realistic && state.faceShots ? { shots: state.faceShots, skin: avatar.scan?.skin } : null);
+const preview = (st) => hair.show(st);
 const deposit = initDeposit({
   STYLES, CATEGORIES, hair, state, toast,
   select: (s, force) => select(s, force),
   async refreshCollection() { buildPanel(); panelCtl.refresh(); await renderThumbs(); },
+  openAtelier: () => curtain(async () => { stopPresent(); extras.setCompare(false); enterSite(); await wait(50); router.go('/artiste'); }),
 });
 const extras = initExtras({ stage, hair, state, STYLES, avatar, select: (s, f) => select(s, f), toast, onReset: () => resetSession() });
 
@@ -403,7 +354,7 @@ function resetSession() {
   extras.setCompare(false);
   extras.clearFavs();
   stopScan();
-  if (state.scanned) { avatar.setMannequin(); state.scanned = false; state.faceShots = null; photoStage.setClient(null); renderThumbs(); }
+  if (state.scanned) { avatar.setMannequin(); state.scanned = false; state.faceShots = null; hair.refresh(); renderThumbs(); }
   state.selected = STYLES[0];
   curtain(async () => {
     stage.controls.enabled = false; stage.controls.autoRotate = false;
@@ -413,36 +364,14 @@ function resetSession() {
   });
 }
 
-// Vignettes rendues hors écran, une par image, sans perturber la scène affichée.
+// Vignettes : la vue de face de chaque coiffure, avec le visage du client s'il est scanné.
 async function renderThumbs() {
-  const cam = new THREE.PerspectiveCamera(30, 1, 1, 1000);
-  // cadrage large : le haut des coiffures volumineuses (afro, chignon) reste dans l'image
-  cam.position.set(34, 13, 96);
-  cam.lookAt(0, 3, 0);
   const thumbs = {};
-  for (const s of STYLES) {
-    if (s.kind === 'photo') {
-      try { thumbs[s.id] = await photoThumb(s); } catch (e) { console.warn(e); }
-      const im = $(`.card[data-id="${s.id}"] img`);
-      if (im && thumbs[s.id]) { im.src = thumbs[s.id]; im.classList.add('ready'); im.previousElementSibling?.remove(); }
-      continue;
-    }
-    const h = hair.get(s);
-    await stage.inFrame(() => {
-    // état courant sauvegardé
-    const saved = [...hair.cache.values()].map((x) => [x, x.group.visible, x.common.uGrow.value, x.group.position.y, x.group.scale.x]);
-    const rot = stage.root.rotation.clone(), py = stage.root.position.y, rev = avatar.uniforms.uReveal.value;
-    for (const [x] of saved) x.group.visible = false;
-    h.group.visible = true; h.common.uGrow.value = 1; h.group.position.y = 0; h.group.scale.setScalar(1);
-    stage.root.rotation.set(0, 0, 0); stage.root.position.y = -1.5; avatar.uniforms.uReveal.value = 1;
-    const ch = avatar.currentHair, chv = ch?.visible; if (ch) ch.visible = false;
-    thumbs[s.id] = stage.renderThumb(cam, 280);
-    if (ch) ch.visible = chv;
-    for (const [x, v, g, y, sc] of saved) { x.group.visible = v; x.common.uGrow.value = g; x.group.position.y = y; x.group.scale.setScalar(sc); }
-    stage.root.rotation.copy(rot); stage.root.position.y = py; avatar.uniforms.uReveal.value = rev;
-    });
-    const img = $(`.card[data-id="${s.id}"] img`);
-    if (img) { img.src = thumbs[s.id]; img.classList.add('ready'); img.previousElementSibling?.remove(); }
+  for (const st of STYLES) {
+    try { thumbs[st.id] = await hair.snapshot(st); } catch (e) { console.warn(e); continue; }
+    const img = $(`.card[data-id="${st.id}"] img`);
+    if (img) { img.src = thumbs[st.id]; img.classList.add('ready'); img.previousElementSibling?.remove(); }
+    await nextFrame();
   }
   site.setThumbs(thumbs);
   router.setThumbs(thumbs);
@@ -467,7 +396,6 @@ function enterStudio() {
 }
 
 async function leaveStudio() {
-  photoStage.hide();
   stage.controls.enabled = false; stage.controls.autoRotate = false;
   $('[data-action="rotate"]').classList.remove('is-on');
   await gsap.to('#panel, #details, #toolbar, .studio__left, #hintDrag', { opacity: 0, y: 20, duration: 0.5, ease: 'power2.in', stagger: 0.03 });
@@ -505,13 +433,13 @@ cardsEl.addEventListener('pointerover', (e) => {
   clearTimeout(hoverTimer);
   const s = STYLES.find((x) => x.id === card.dataset.id);
   if (state.presenting) return;
-  if (hair.current !== s.id || (s.kind === 'photo' && !photoStage.active)) { preview(s); setBigTitle(s.name); }
+  if (hair.current !== s.id) { preview(s); setBigTitle(s.name); }
 });
 cardsEl.addEventListener('pointerleave', () => {
   clearTimeout(hoverTimer);
   hoverTimer = setTimeout(() => {
     if (state.presenting) return;
-    if (hair.current !== state.selected.id || state.selected.kind === 'photo') { preview(state.selected); setBigTitle(state.selected.name); }
+    if (hair.current !== state.selected.id) { preview(state.selected); setBigTitle(state.selected.name); }
   }, 280);
 });
 cardsEl.addEventListener('click', (e) => {
@@ -530,7 +458,6 @@ $('#swatches').addEventListener('click', (e) => {
   state.color = c;
   $$('.sw').forEach((x) => x.classList.toggle('is-active', x === sw));
   hair.setColor(c.hex, c.tip);
-  photoStage.setColor(c.hex, c.tip, c.id === COLORS[0].id);
   $('#dColor').textContent = c.name;
 });
 
@@ -543,7 +470,7 @@ function setLook(look, animate = true) {
   pill.style.width = `${btn.offsetWidth}px`;
   pill.style.transform = `translateX(${btn.offsetLeft - 4}px)`;
   if (!state.scanned) return;
-  if (photoStage.active) setTimeout(() => photoStage.setClient(look === 'real' ? { shots: state.faceShots, skin: avatar.scan?.skin } : null), animate ? 450 : 0);
+  setTimeout(() => hair.refresh(), animate ? 450 : 0);
   if (animate) {
     gsap.timeline()
       .to(avatar.uniforms.uReveal, { value: 0.55, duration: 0.45, ease: 'power2.in' })
@@ -658,7 +585,7 @@ document.addEventListener('click', async (e) => {
       const go = () => {
         stopScan();
         if (state.screen === 'site') leaveSite();
-        if (state.scanned) { avatar.setMannequin(); state.scanned = false; state.faceShots = null; photoStage.setClient(null); renderThumbs(); }
+        if (state.scanned) { avatar.setMannequin(); state.scanned = false; state.faceShots = null; hair.refresh(); renderThumbs(); }
         enterStudio();
       };
       if (state.screen === 'site') curtain(async () => go()); else go();
@@ -731,7 +658,7 @@ boot();
 
 // accès debug
 window.__miroir = {
-  stage, avatar, hair, state, STYLES, select, processCapture, site, buildFace, router, photoStage,
+  stage, avatar, hair, state, STYLES, select, processCapture, site, buildFace, router,
   /** Kit artiste : le mannequin en .glb (base64), pour scratch/export-mannequin. */
   async exportMannequin() {
     const { exportMannequinGlb } = await import('./three/exportMannequin.js');

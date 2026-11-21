@@ -7,7 +7,7 @@ import { forgetViews } from '../photo/stage.js';
 const $ = (s, r = document) => r.querySelector(s);
 const MAX = 40 * 1024 * 1024;   // 40 Mo
 
-export function initDeposit({ STYLES, CATEGORIES, hair, state, select, refreshCollection, toast }) {
+export function initDeposit({ STYLES, CATEGORIES, hair, state, select, refreshCollection, toast, openAtelier }) {
   const dlg = $('#dep'), form = $('#depForm'), info = $('#depInfo'), err = $('#depErr');
   $('#depCat').innerHTML = CATEGORIES.filter((c) => c.id !== 'all').map((c) => `<option value="${c.id}">${c.label}</option>`).join('');
   let pending = null;   // { id, data, prev }
@@ -71,7 +71,7 @@ export function initDeposit({ STYLES, CATEGORIES, hair, state, select, refreshCo
 
   document.addEventListener('click', (e) => {
     const a = e.target.closest('[data-action]'); if (!a) return;
-    if (a.dataset.action === 'add-style') $('#glbInput').click();
+    if (a.dataset.action === 'add-style') openAtelier?.();
     if (a.dataset.action === 'dep-cancel') cancel();
     if (a.dataset.action === 'remove-style') remove(state.selected);
   });
@@ -108,7 +108,9 @@ export function initDeposit({ STYLES, CATEGORIES, hair, state, select, refreshCo
       const recs = (await loadStyles()).sort((a, b) => (a.added || 0) - (b.added || 0));
       let n = 0;
       for (const r of recs) {
-        try { if (r.type !== 'photo') await registerGlb(r.id, r.data); STYLES.push(toStyle(r)); n++; } catch (e) { console.warn('coiffure illisible', r.name, e); }
+        // seules les coiffures-photos sont reprises (les anciens fichiers 3D ne sont plus affichés)
+        if (r.type !== 'photo') continue;
+        STYLES.push(toStyle(r)); n++;
       }
       return n;
     },

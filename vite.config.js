@@ -7,6 +7,8 @@ import { resolve } from 'node:path';
 const ROUTES = ['collection', 'heritage', 'technologie', 'salons', 'partenaires', 'journal', 'a-propos', 'faq', 'contact', 'artiste'];
 
 export default defineConfig({
+  // chargement du catalogue avant le démarrage (await au niveau du module)
+  build: { target: 'es2022' },
   plugins: [{
     name: 'garo-routes',
     apply: 'build',

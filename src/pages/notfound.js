@@ -25,7 +25,7 @@ export default {
     gsap.fromTo($('.nf__code', root).children, { yPercent: 40, opacity: 0 }, { yPercent: 0, opacity: 1, duration: 1.6, ease: 'expo.out', stagger: 0.08 });
     // un clic sur le « 0 » rend une coiffure au mannequin
     let n = 0;
-    $('.nf__o', root).addEventListener('click', () => { hair.show(STYLES[n++ % STYLES.length], 'drop'); });
+    $('.nf__o', root).addEventListener('click', () => { hair.show(STYLES[n++ % STYLES.length]); });
     return {
       pose: (_, stacked) => P({ x: 0, y: stacked ? 0.08 : 0.02, theta: 0.2, phi: 1.5, r: stacked ? 128 : 96, sway: 1 }),
     };

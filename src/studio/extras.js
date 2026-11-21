@@ -1,5 +1,4 @@
 // Studio : comparateur avant/après à glisser, favoris côte à côte, veille du mode borne.
-import * as THREE from 'three';
 import gsap from 'gsap';
 
 const $ = (s, r = document) => r.querySelector(s);
@@ -10,14 +9,9 @@ export function initExtras({ stage, hair, state, STYLES, select, toast, onReset,
   const split = $('#split'), line = $('#splitLine'), handle = $('#splitHandle');
   const sp = { x: 0 };
   let hidden = null;
-  stage.split = {
-    get x() { return state.compare ? sp.x : 0; },
-    // « Avant » : la coiffure disparaît et les cheveux réels du scan réapparaissent
-    hide() { hidden = hair.current ? hair.cache.get(hair.current) : null; if (hidden) hidden.group.visible = false; avatar?.showCurrentHair(true); },
-    show() { if (hidden) hidden.group.visible = true; hidden = null; avatar?.showCurrentHair(!hair.current); },
-  };
+  // « Avant » : le mannequin seul ; « Après » : avec le visage du client
   const placeLine = () => { line.style.transform = `translateX(${sp.x * window.innerWidth}px)`; };
-  gsap.ticker.add(() => { if (state.compare) placeLine(); });
+  gsap.ticker.add(() => { if (state.compare) placeLine(); hair.setSplit?.(state.compare ? sp.x : 0); });
 
   function setCompare(on) {
     if (on === state.compare) return;
@@ -25,7 +19,7 @@ export function initExtras({ stage, hair, state, STYLES, select, toast, onReset,
     $('[data-action="compare"]').classList.toggle('is-on', on);
     gsap.killTweensOf(sp);
     if (on) {
-      if (hair.current !== state.selected.id) hair.show(state.selected, 'instant');
+      if (hair.current !== state.selected.id) hair.show(state.selected);
       split.hidden = false;
       sp.x = 1;
       // balayage d'ouverture : on montre l'avant, puis on se cale au milieu
@@ -97,28 +91,12 @@ export function initExtras({ stage, hair, state, STYLES, select, toast, onReset,
     }
   }
 
-  // modale côte à côte : chaque favori rendu sur l'avatar de la personne
-  const favCam = new THREE.PerspectiveCamera(28, 1, 1, 1000);
-  favCam.position.set(30, 11, 98); favCam.lookAt(0, 2.5, 0);
-  function renderOn(style) {
-    const h = hair.get(style);
-    const saved = [...hair.cache.values()].map((x) => [x, x.group.visible, x.common.uGrow.value, x.group.position.y, x.group.scale.x]);
-    const rot = stage.root.rotation.clone();
-    for (const [x] of saved) x.group.visible = false;
-    h.group.visible = true; h.common.uGrow.value = 1; h.group.position.y = 0; h.group.scale.setScalar(1);
-    stage.root.rotation.set(0, 0, 0);
-    const ch = avatar?.currentHair, chv = ch?.visible; if (ch) ch.visible = false;
-    const url = stage.renderThumb(favCam, 420);
-    if (ch) ch.visible = chv;
-    for (const [x, v, g, y, sc] of saved) { x.group.visible = v; x.common.uGrow.value = g; x.group.position.y = y; x.group.scale.setScalar(sc); }
-    stage.root.rotation.copy(rot);
-    return url;
-  }
+  // modale côte à côte : chaque favori composé avec le visage de la personne
   async function openFavs() {
     if (favs.size < 2) { toast('Ajoutez au moins deux favoris avec le cœur pour les comparer'); return; }
     const list = STYLES.filter((s) => favs.has(s.id));
     const shots = {};
-    for (const s of list) shots[s.id] = await stage.inFrame(() => renderOn(s));
+    for (const s of list) shots[s.id] = await hair.snapshot(s, 420);
     $('#favsGrid').innerHTML = list.map((s, i) => `
       <article class="fav" data-id="${s.id}">
         <span class="fav__n">${String(i + 1).padStart(2, '0')}</span>

@@ -14,7 +14,8 @@ async function segmenter() {
     const { getFileset } = await import('../scan/scanner.js');
     const fileset = await getFileset();
     const opts = (delegate) => ({ baseOptions: { modelAssetPath: '/models/selfie_segmenter.tflite', delegate }, runningMode: 'IMAGE', outputCategoryMask: false, outputConfidenceMasks: true });
-    try { return await ImageSegmenter.createFromOptions(fileset, opts('GPU')); } catch { return ImageSegmenter.createFromOptions(fileset, opts('CPU')); }
+    // modèle minuscule (256 px) : le processeur est plus rapide et plus sûr que le GPU ici
+    return ImageSegmenter.createFromOptions(fileset, opts('CPU'));
   })();
   return segP;
 }
@@ -73,36 +74,31 @@ export function prepareView(img, opts = {}) {
   const L = new Float32Array(N);
   for (let i = 0; i < N; i++) L[i] = lumOf(px[i * 4], px[i * 4 + 1], px[i * 4 + 2]) / 255;
 
-  // fond : couleur médiane des bords, puis remplissage tant que la couleur reste proche
+  // fond : couleur médiane du haut et des côtés (le bas coupe souvent le buste)
   const border = [];
-  for (let x = 0; x < w; x += 4) border.push(x, (h - 1) * w + x);
-  for (let y = 0; y < h; y += 4) border.push(y * w, y * w + w - 1);
+  for (let x = 0; x < w; x += 3) border.push(x);
+  for (let y = 0; y < h * 0.8; y += 3) border.push((y | 0) * w, (y | 0) * w + w - 1);
   const med = (arr) => { const a = Float32Array.from(arr).sort(); return a[a.length >> 1]; };
   const br = med(border.map((i) => px[i * 4])), bgc = med(border.map((i) => px[i * 4 + 1])), bb = med(border.map((i) => px[i * 4 + 2]));
-  const tol = (opts.bg ?? 14) ** 2 * 3;
+  const tol = (opts.bg ?? 12) ** 2 * 3;
+  // premier plan certain : couleur nettement différente du fond, ou personne détectée
+  const fg = new Uint8Array(N);
+  for (let i = 0; i < N; i++) {
+    const d = (px[i * 4] - br) ** 2 + (px[i * 4 + 1] - bgc) ** 2 + (px[i * 4 + 2] - bb) ** 2;
+    fg[i] = d > tol || (opts.person && opts.person[i] > 0.55) ? 1 : 0;
+  }
+  // le fond est ce qu'on atteint depuis les bords sans traverser le premier plan ni un contour ;
+  // tout le reste est le mannequin (les trous intérieurs sont ainsi bouchés)
   const bg = new Uint8Array(N);
   const stack = [];
-  for (const i of border) {
-    const d = (px[i * 4] - br) ** 2 + (px[i * 4 + 1] - bgc) ** 2 + (px[i * 4 + 2] - bb) ** 2;
-    if (d < tol) { bg[i] = 1; stack.push(i); }
-  }
+  for (const i of border) if (!fg[i]) { bg[i] = 1; stack.push(i); }
+  const edge = opts.edge ?? 0.03;
   while (stack.length) {
     const i = stack.pop(), x = i % w, y = (i / w) | 0;
     for (const j of [x > 0 ? i - 1 : -1, x < w - 1 ? i + 1 : -1, y > 0 ? i - w : -1, y < h - 1 ? i + w : -1]) {
-      if (j < 0 || bg[j]) continue;
-      // tolérance un peu plus large entre voisins (dégradés doux du fond)
-      const d = (px[j * 4] - br) ** 2 + (px[j * 4 + 1] - bgc) ** 2 + (px[j * 4 + 2] - bb) ** 2;
-      // et sans franchir de contour : le fond varie doucement, le bord du mannequin marque un saut
-      if (d < tol * 2.2 && Math.abs(L[j] - L[i]) < (opts.edge ?? 0.018)) { bg[j] = 1; stack.push(j); }
+      if (j < 0 || bg[j] || fg[j]) continue;
+      if (Math.abs(L[j] - L[i]) < edge) { bg[j] = 1; stack.push(j); }
     }
-  }
-
-  // détourage disponible : il remplace le remplissage depuis les bords
-  // (au bord incertain du détourage, un pixel de la couleur du fond reste du fond)
-  if (opts.person) for (let i = 0; i < N; i++) {
-    const p = opts.person[i];
-    const d = (px[i * 4] - br) ** 2 + (px[i * 4 + 1] - bgc) ** 2 + (px[i * 4 + 2] - bb) ** 2;
-    bg[i] = p < 0.5 || (p < 0.92 && d < tol) ? 1 : 0;
   }
 
   // cheveux : seuil d'Otsu sur la luminance du mannequin (hors fond)
@@ -222,7 +218,7 @@ export function compose(view, client, opts = {}, out = document.createElement('c
   if (opts.cutout && view.alpha) {
     const f0 = h * 0.8;   // le bas du buste s'efface doucement
     for (let i = 0; i < w * h; i++) {
-      const y = (i / w) | 0, fade = y > f0 ? Math.max(0, 1 - (y - f0) / (h - f0)) : 1;
+      const y = (i / w) | 0, x = i % w, fade = (y > f0 ? Math.max(0, 1 - (y - f0) / (h - f0)) : 1) * Math.min(1, x / (w * 0.05), (w - 1 - x) / (w * 0.05), y / (h * 0.03));
       d[i * 4 + 3] = Math.round(255 * view.alpha[i] * fade * fade * (3 - 2 * fade));
     }
   }

@@ -54,7 +54,9 @@ function splitLines(el) {
 export function createSite({ stage, avatar, hair, STYLES, COLORS, mouse, onTry }) {
   const byId = (id) => STYLES.find((s) => s.id === id);
   // sélection courte pour la vitrine (la cabine présente tout le catalogue)
-  const FEAT = ['box-braids', 'cornrows', 'locks', 'afro', 'waves-fade', 'bun'].map(byId);
+  // coiffures du catalogue (photos) : la vitrine en montre jusqu'à six
+  const pick = (i) => STYLES[((i % STYLES.length) + STYLES.length) % STYLES.length];
+  const FEAT = STYLES.slice(0, 6);
   const lenis = new Lenis({ duration: reduced ? 0.6 : 1.35, easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)), wheelMultiplier: 0.85, touchMultiplier: 1.4 });
   lenis.stop();
   lenis.on('scroll', ScrollTrigger.update);
@@ -70,12 +72,10 @@ export function createSite({ stage, avatar, hair, STYLES, COLORS, mouse, onTry }
   // position écran de la tête (pour le cadre de scan et le cadran 360°)
   const HEAD = new THREE.Vector3(0, 2.6, -4.9), _w = new THREE.Vector3(), _e = new THREE.Vector3();
   function headScreen(radiusCm = 12) {
-    stage.root.updateMatrixWorld();
-    _w.copy(HEAD); stage.root.localToWorld(_w);
-    _e.copy(_w).project(stage.camera);
-    const dist = stage.camera.position.distanceTo(_w);
-    const pxPerCm = window.innerHeight / (2 * dist * Math.tan(THREE.MathUtils.degToRad(stage.camera.fov / 2)));
-    return { x: (_e.x * 0.5 + 0.5) * window.innerWidth, y: (-_e.y * 0.5 + 0.5) * window.innerHeight, s: radiusCm * pxPerCm };
+    const W = window.innerWidth, H = window.innerHeight;
+    const dist = stage.camera.position.distanceTo(stage.controls.target) || 100;
+    const pxPerCm = (H * 0.74 * (100 / dist) * (W / H < 1.05 ? 1.35 : 1) * 0.5) / 24;   // la tête occupe environ la moitié de la photo
+    return { x: W / 2 + stage.view.shiftX * W, y: H * 0.47 + stage.view.shiftY * H, s: radiusCm * pxPerCm };
   }
 
   const scanframe = $('#scanframe'), dial = $('#dial');
@@ -132,19 +132,19 @@ export function createSite({ stage, avatar, hair, STYLES, COLORS, mouse, onTry }
   // ---------- coiffure par section ----------
   const sectionHair = {
     hero: () => startCycle(),
-    mani: () => hair.show(byId('bun'), 'drop'),
+    mani: () => hair.show(pick(1)),
     proc: () => applyProcess(procState.p, true),
-    coll: () => hair.show(FEAT[collState.idx], 'drop'),
-    r360: () => hair.show(byId('cornrows'), 'drop'),
-    colors: () => { hair.show(byId('box-braids'), 'drop'); applyColor(colorState.idx, true); },
-    final: () => hair.show(byId('afro'), 'drop'),
+    coll: () => hair.show(FEAT[collState.idx]),
+    r360: () => hair.show(pick(0)),
+    colors: () => { hair.show(pick(0)); applyColor(colorState.idx, true); },
+    final: () => hair.show(pick(1)),
   };
   function setCurrent(key) {
     if (page) return;
     if (current === key) return;
     if (current === 'hero') stopCycle();
     if (current === 'colors' && key !== 'colors') { hair.setColor(COLORS[0].hex, COLORS[0].tip); gsap.to('#bgTint', { opacity: 0, duration: 1 }); }
-    if (current === 'proc' && key !== 'proc') { avatar.uniforms.uReveal.value = 1; pose.spin = 0; gsap.to(scanframe, { opacity: 0, duration: 0.4 }); }
+    if (current === 'proc' && key !== 'proc') { hair.setReveal(1); pose.spin = 0; gsap.to(scanframe, { opacity: 0, duration: 0.4 }); }
     if (current === 'r360' && key !== 'r360') gsap.to(dial, { opacity: 0, duration: 0.5 });
     if (key === 'r360') gsap.to(dial, { opacity: 1, duration: 0.8 });
     current = key;
@@ -154,12 +154,12 @@ export function createSite({ stage, avatar, hair, STYLES, COLORS, mouse, onTry }
   SECTIONS.forEach(([key, sel]) => ScrollTrigger.create({ trigger: sel, start: 'top 55%', end: 'bottom 55%', onToggle: (self) => self.isActive && setCurrent(key) }));
 
   // ---------- héros : vitrine tournante ----------
-  const HERO = ['box-braids', 'afro', 'waves-fade', 'bun', 'locks', 'cornrows', 'twists'].map(byId);
+  const HERO = STYLES;
   let cycleIdx = 0, cycleTimer = null;
   function startCycle() {
     stopCycle();
     const s = HERO[cycleIdx % HERO.length];
-    hair.show(s, 'drop');
+    hair.show(s);
     const now = $('#heroNow');
     gsap.to(now, { yPercent: -60, opacity: 0, duration: 0.3, ease: 'power2.in', onComplete: () => { now.textContent = s.name; gsap.fromTo(now, { yPercent: 60, opacity: 0 }, { yPercent: 0, opacity: 1, duration: 0.7, ease: 'expo.out' }); } });
     gsap.fromTo('#heroBar', { scaleX: 0 }, { scaleX: 1, duration: 3.4, ease: 'none' });
@@ -229,22 +229,22 @@ export function createSite({ stage, avatar, hair, STYLES, COLORS, mouse, onTry }
     if (i === 0) {
       // balayage de scan : la tête se reconstruit sous la ligne lumineuse
       const k = Math.min(1, local * 1.15);
-      avatar.uniforms.uReveal.value = 0.3 + 0.7 * k;
+      hair.setReveal(0.3 + 0.7 * k);
       scanframe.style.setProperty('--scan', `${Math.min(100, k * 100)}%`);
       scanPct.textContent = String(Math.round(k * 468)).padStart(3, '0');
       gsap.to(scanframe, { opacity: 1, duration: 0.4, overwrite: 'auto' });
       pose.spin = 0;
-      if (hair.current) hair.hideAll(0.4);
+      if (!hair.current) hair.show(pick(0));
     } else if (i === 1) {
-      avatar.uniforms.uReveal.value = 1;
+      hair.setReveal(1);
       gsap.to(scanframe, { opacity: 0, duration: 0.4, overwrite: 'auto' });
       pose.spin = -Math.sin(local * Math.PI) * 1.1;
-      if (hair.current) hair.hideAll(0.4);
+      if (!hair.current) hair.show(pick(0));
     } else {
-      avatar.uniforms.uReveal.value = 1;
+      hair.setReveal(1);
       gsap.to(scanframe, { opacity: 0, duration: 0.4, overwrite: 'auto' });
       pose.spin = 0;
-      if (force || hair.current !== 'box-braids') hair.show(byId('box-braids'), 'drop');
+      if (force || hair.current !== pick(0).id) hair.show(pick(0));
     }
   }
   ScrollTrigger.create({ trigger: '#processus', start: 'top top', end: 'bottom bottom', onUpdate: (self) => applyProcess(self.progress) });
@@ -274,7 +274,7 @@ export function createSite({ stage, avatar, hair, STYLES, COLORS, mouse, onTry }
       gsap.fromTo(splitChars(collName), { yPercent: 100, opacity: 0 }, { yPercent: 0, opacity: 1, duration: 0.9, ease: 'expo.out', stagger: 0.02 });
     };
     if (old.length) gsap.to(old, { yPercent: -100, opacity: 0, duration: 0.25, stagger: 0.008, onComplete: write }); else write();
-    if (active && current === 'coll') hair.show(FEAT[i], 'drop');
+    if (active && current === 'coll') hair.show(FEAT[i]);
   }
   ScrollTrigger.create({
     trigger: '#collection', start: 'top top', end: 'bottom bottom',
@@ -570,7 +570,7 @@ export function createSite({ stage, avatar, hair, STYLES, COLORS, mouse, onTry }
       stopCycle();
       clearInterval(screenTimer);
       lenis.stop();
-      avatar.uniforms.uReveal.value = 1;
+      hair.setReveal(1);
       pose.spin = 0; pose.rotY = 0;
       hair.setColor(COLORS[0].hex, COLORS[0].tip);
       gsap.set([scanframe, dial, '#bgTint'], { opacity: 0 });
@@ -583,7 +583,7 @@ export function createSite({ stage, avatar, hair, STYLES, COLORS, mouse, onTry }
     openPage(p) {
       stopCycle();
       clearInterval(screenTimer);
-      avatar.uniforms.uReveal.value = 1;
+      hair.setReveal(1);
       hair.setColor(COLORS[0].hex, COLORS[0].tip);
       gsap.set([scanframe, dial, '#bgTint'], { opacity: 0 });
       document.body.classList.remove('on-light');

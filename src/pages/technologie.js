@@ -1,16 +1,14 @@
 // Technologie : la fabrication de l'avatar racontée au défilement
 // (points du visage, trois prises, visage posé sur le mannequin, coiffures, confidentialité).
-import * as THREE from 'three';
 import gsap from 'gsap';
-import { buildHeadGeometry, mannequinVerts } from '../three/head.js';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { $, $$, pad2, clamp, ease, mix, P, pageHero, pageFoot, reveals, eyebrow } from './kit.js';
 
 const STEPS = [
   { n: '468', u: 'points', t: 'Le visage, point par point', d: 'La caméra repère 468 points du visage à chaque image : contour des yeux, arête du nez, lèvres, mâchoire. Ils fixent la position exacte de la tête.' },
   { n: '3', u: 'prises', t: 'Face et trois-quarts', d: 'Une photo de face, nette et bien éclairée, puis un quart de tour de chaque côté. Les trois vues affinent le relief : nez, pommettes, menton.' },
-  { n: '1', u: 'mannequin', t: 'Le visage se pose', d: 'Le relief et la photo du visage se fondent dans la tête unique du mannequin GARO, au teint de la personne. Crâne, oreilles et cou restent ceux du mannequin.' },
-  { n: '12', u: 'coiffures', t: 'Les cheveux poussent', d: 'Chaque coiffure est construite une fois, sur ce mannequin. Elle tombe donc juste sur chaque visage, et un salon peut en ajouter de nouvelles en déposant les photos d’un mannequin coiffé.' },
+  { n: '1', u: 'ovale', t: 'Le visage se pose', d: 'Chaque coiffure est photographiée sur un mannequin. Le visage du client est posé dans l’ovale du mannequin, à son échelle, et tout le corps prend son teint.' },
+  { n: '4', u: 'vues', t: 'Faire le tour', d: 'Face, trois-quarts, dos : on glisse pour tourner autour de la coiffure. Les cheveux de la photo restent devant le visage, franges et contours compris.' },
   { n: '0', u: 'image envoyée', t: 'Rien ne sort du salon', d: 'Tout le calcul se fait sur l’appareil : la tablette, la télé ou la borne. Aucune photo n’est envoyée, aucune n’est conservée après la séance.' },
 ];
 
@@ -42,7 +40,7 @@ export default {
       <div class="tc-specs__grid">
         <div data-reveal><b data-count="468">0</b><span>points suivis sur le visage, à chaque image</span></div>
         <div data-reveal><b data-count="3">0</b><span>prises du visage : face et deux trois-quarts</span></div>
-        <div data-reveal><b data-count="12">0</b><span>coiffures construites en 3D sur le mannequin GARO</span></div>
+        <div data-reveal><b data-count="4">0</b><span>vues par coiffure : face, trois-quarts et dos</span></div>
         <div data-reveal><b>0</b><span>image envoyée sur internet. Tout reste sur l’appareil</span></div>
       </div>
     </section>
@@ -65,23 +63,11 @@ export default {
   `,
   mount(root, { hair, STYLES, avatar }) {
     reveals(root);
-    const byId = (id) => STYLES.find((s) => s.id === id);
+    const byId = (id) => STYLES.find((s) => s.id === id) || STYLES[[...String(id)].reduce((a, c) => a + c.charCodeAt(0), 0) % STYLES.length];
     const steps = $$('.tc-step', root), nav = $$('.tc__nav li', root);
     const num = $('#tcNum', root), unit = $('#tcUnit', root), scan = $('#tcScan', root);
     const inst = { spin: 0 };
     let cur = -1, inRun = false, local = 0;
-    // maillage filaire doré posé sur la tête (grille volontairement lâche, lisible)
-    let net = null;
-    const wire = (on) => {
-      if (on && !net) {
-        const g = buildHeadGeometry(avatar.scan ? avatar.scan.verts : mannequinVerts(), null, { NT: 64, NY: 56 });
-        net = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: 0xe9cf9f, wireframe: true, transparent: true, opacity: 0, depthWrite: false }));
-        net.scale.setScalar(1.006);
-        avatar.group.add(net);
-      }
-      if (net) gsap.to(net.material, { opacity: on ? 0.55 : 0, duration: 0.6 });
-    };
-
     function setStep(i) {
       if (cur === i) return;
       const prev = cur; cur = i;
@@ -91,10 +77,7 @@ export default {
       steps.forEach((s, k) => { if (k !== i) gsap.to(s.children, { opacity: 0, y: -20 * (i > k ? 1 : -1), duration: 0.35, ease: 'power2.in', overwrite: true }); });
       gsap.fromTo(steps[i].children, { y: 30 * (i > prev ? 1 : -1), opacity: 0 }, { y: 0, opacity: 1, duration: 1, ease: 'expo.out', stagger: 0.06, overwrite: true });
       if (!inRun) return;
-      wire(i === 2);
-      if (i === 0 || i === 1 || i === 2) hair.hideAll(0.4);
-      if (i === 3) hair.show(byId('locks'), 'grow');
-      if (i === 4) hair.show(byId('afro'), 'drop');
+      hair.show(STYLES[i % STYLES.length]);
     }
     const run = $('#tcRun', root);
     const st = {
@@ -111,24 +94,24 @@ export default {
           // étape 1 : la tête se reconstruit sous la ligne de balayage
           if (inRun && i === 0) {
             const k = clamp(local * 1.25, 0, 1);
-            avatar.uniforms.uReveal.value = 0.3 + 0.7 * k;
+            hair.setReveal(0.3 + 0.7 * k);
             scan.style.setProperty('--y', `${(1 - k) * 100}%`);
             scan.classList.add('is-on');
-          } else { avatar.uniforms.uReveal.value = 1; scan.classList.remove('is-on'); }
+          } else { hair.setReveal(1); scan.classList.remove('is-on'); }
           // étape 2 : un tour complet
           inst.spin = inRun && i === 1 ? Math.sin(local * Math.PI * 2) * 0.7 : 0;
         },
         onToggle: (self) => {
           inRun = self.isActive;
           if (inRun) { const k = cur; cur = -1; setStep(Math.max(0, k)); }
-          else { wire(false); avatar.uniforms.uReveal.value = 1; scan.classList.remove('is-on'); if (self.progress >= 1 && !hair.current) hair.show(byId('afro'), 'drop'); }
+          else { hair.setReveal(1); scan.classList.remove('is-on'); if (!hair.current) hair.show(STYLES[0]); }
         },
       }),
       specs: ScrollTrigger.create({ trigger: '.tc-specs', start: 'top bottom', end: 'top 20%' }),
       foot: ScrollTrigger.create({ trigger: '.pg-foot', start: 'top bottom', end: 'top 30%' }),
     };
     setStep(0);
-    hair.show(byId('waves-fade'), 'drop');
+    hair.show(byId('waves-fade'));
     nav.forEach((li) => li.addEventListener('click', () => {
       const k = +li.dataset.i;
       window.__garoLenis?.scrollTo(st.run.start + ((k + 0.45) / STEPS.length) * (st.run.end - st.run.start), { duration: 1.4 });
@@ -147,7 +130,7 @@ export default {
         const s = window.matchMedia('(orientation: portrait), (max-width: 760px)').matches;
         return 1 - (s ? 0.75 : 0.3) * st.specs.progress - 0.6 * st.foot.progress;
       },
-      destroy() { if (net) { avatar.group.remove(net); net.geometry.dispose(); net.material.dispose(); } avatar.uniforms.uReveal.value = 1; },
+      destroy() { hair.setReveal(1); },
     });
     return inst;
   },

@@ -93,7 +93,7 @@ export default {
   `,
   mount(root, { hair, STYLES }) {
     reveals(root);
-    const byId = (id) => STYLES.find((s) => s.id === id);
+    const byId = (id) => STYLES.find((s) => s.id === id) || STYLES[[...String(id)].reduce((a, c) => a + c.charCodeAt(0), 0) % STYLES.length];
     const state = { dev: 'tablette', chairs: 4, sites: 1 };
     const device = $('#slDevice', root);
     const HAIR = { tablette: 'box-braids', tv: 'afro', borne: 'waves-fade' };
@@ -118,7 +118,7 @@ export default {
       const d = DEVICES[dev];
       device.dataset.shape = d.shape;
       $('#slCap', root).textContent = `${d.label} · ${d.where}`;
-      if (inSim && hair.current !== HAIR[dev]) hair.show(byId(HAIR[dev]), 'drop');
+      if (inSim && hair.current !== HAIR[dev]) hair.show(byId(HAIR[dev]));
     }
     $('#slDev', root).addEventListener('click', (e) => {
       const b = e.target.closest('button'); if (!b) return;
@@ -146,7 +146,7 @@ export default {
       plans: ScrollTrigger.create({ trigger: '.sl-plans', start: 'top 80%', end: 'top 20%' }),
       foot: ScrollTrigger.create({ trigger: '.pg-foot', start: 'top bottom', end: 'top 30%' }),
     };
-    hair.show(byId('locks'), 'drop');
+    hair.show(byId('locks'));
 
     // l'écran choisi change la façon dont le mannequin est cadré
     const SIM = {

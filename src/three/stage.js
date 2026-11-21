@@ -105,6 +105,7 @@ export class Stage {
     const dt = Math.min(this.clock.getDelta(), 0.05), t = this.clock.elapsedTime;
     for (const fn of this.updaters) fn(dt, t);
     if (this.controls.enabled || this.controls.autoRotate) this.controls.update();
+    if (this.paused) return;
     this.renderer.render(this.scene, this.camera);
     // comparateur avant/après : la partie gauche est re-rendue sans la coiffure
     const sp = this.split;

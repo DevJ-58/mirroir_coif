@@ -11,7 +11,7 @@ const cache = new Map();   // id de style → Promise<vues analysées>
 export function viewsOf(style) {
   if (!cache.has(style.id)) {
     cache.set(style.id, Promise.all(style.views.map(async (v) => {
-      const img = await loadImage(v.data, v.mime);
+      const img = await loadImage(v.src || v.data, v.mime);
       const V = await analyseView(img);
       V.kind = v.kind;
       V.face = v.face ? { cx: v.face.cx * V.w, cy: v.face.cy * V.h, rx: v.face.rx * V.w, ry: v.face.ry * V.h, a: v.face.a || 0 } : null;
